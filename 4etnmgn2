@@ -41,7 +41,7 @@ local spinbot = { enabled = false, speed = 150 }
 local antiaim = { enabled = false }
 local aastates = { "Standing" , "Moving", "Crouch" , "Jumping" , "SlowWalk" }
 local function aadefset()
-	return { yaw_base = "Spin", yaw_offset = 0, jitter = false, jitter_offset = 30, jitter_speed = 10, pitch = "None", extend_pitch = false, body_roll = "None", spin_speed = 50, }
+    return { yaw_base = "Spin", yaw_offset = 0, jitter = false, jitter_offset = 30, jitter_speed = 10, pitch = "None", extend_pitch = false, body_roll = "None", spin_speed = 50, smooth_jitter = false, smooth_jitter_from = -30, smooth_jitter_to = 30, smooth_jitter_speed = 3, }
 end
 local aacfgpizda = {}
 for _, s in ipairs(aastates) do aacfgpizda[s] = aadefset() end
@@ -3179,6 +3179,18 @@ do
 		end);
 		depBox:AddSlider("aa_" .. stateName .. "_jitter_speed", {Text="Jitter Speed",Default=10,Min=1,Max=500,Rounding=0,Suffix="ms"}):OnChanged(function()
 			aacfgpizda[stateName].jitter_speed = Options["aa_" .. stateName .. "_jitter_speed"].Value;
+		end);
+		depBox:AddToggle("aa_" .. stateName .. "_smooth_jitter", {Text="Smooth Jitter",Default=false}):OnChanged(function()
+			aacfgpizda[stateName].smooth_jitter = Toggles["aa_" .. stateName .. "_smooth_jitter"].Value;
+		end);
+		depBox:AddSlider("aa_" .. stateName .. "_smooth_jitter_from", {Text="Smooth From",Default=-30,Min=-180,Max=0,Rounding=0,Suffix="°"}):OnChanged(function()
+			aacfgpizda[stateName].smooth_jitter_from = Options["aa_" .. stateName .. "_smooth_jitter_from"].Value;
+		end);
+		depBox:AddSlider("aa_" .. stateName .. "_smooth_jitter_to", {Text="Smooth To",Default=30,Min=0,Max=180,Rounding=0,Suffix="°"}):OnChanged(function()
+			aacfgpizda[stateName].smooth_jitter_to = Options["aa_" .. stateName .. "_smooth_jitter_to"].Value;
+		end);
+		depBox:AddSlider("aa_" .. stateName .. "_smooth_jitter_speed", {Text="Smooth Speed",Default=3,Min=1,Max=20,Rounding=1}):OnChanged(function()
+			aacfgpizda[stateName].smooth_jitter_speed = Options["aa_" .. stateName .. "_smooth_jitter_speed"].Value;
 		end);
 		depBox:AddDropdown("aa_" .. stateName .. "_pitch", {Text="Pitch",Default="None",Values={"None","Up","Down","Zero","Random","Custom"}}):OnChanged(function()
 			aacfgpizda[stateName].pitch = Options["aa_" .. stateName .. "_pitch"].Value;
@@ -6432,6 +6444,33 @@ function kykoldingrenade()
 	return grenadenames[weapName] == true;
 end
 
+local aaSmoothJitterState = {
+    currentAngle = -30,
+    direction = 1,
+}
+
+local function getSmoothJitterOffset(aaState, dt)
+    local cfg = aacfgpizda[aaState]
+    if not cfg or not cfg.smooth_jitter then return nil end
+
+    local fromAngle = cfg.smooth_jitter_from
+    local toAngle = cfg.smooth_jitter_to
+    local speed = cfg.smooth_jitter_speed
+
+    local target = (aaSmoothJitterState.direction == 1) and toAngle or fromAngle
+    local diff = target - aaSmoothJitterState.currentAngle
+    local step = speed * dt * 60
+
+    if math.abs(diff) <= step then
+        aaSmoothJitterState.currentAngle = target
+        aaSmoothJitterState.direction = -aaSmoothJitterState.direction
+    else
+        aaSmoothJitterState.currentAngle = aaSmoothJitterState.currentAngle + (diff > 0 and step or -step)
+    end
+
+    return aaSmoothJitterState.currentAngle
+end
+
 RunService.RenderStepped:Connect(function()
 	if (antiaim.enabled and IsAlive(localPlayer)) then
 		if kykoldingrenade() then
@@ -6462,51 +6501,65 @@ RunService.RenderStepped:Connect(function()
 					end
 				end
 				local s = {
-					yaw_base      = Options["aa_" .. aaState .. "_yaw_base"].Value,
-					yaw_offset    = Options["aa_" .. aaState .. "_yaw_offset"].Value,
-					jitter        = Toggles["aa_" .. aaState .. "_jitter"].Value,
+					yaw_base = Options["aa_" .. aaState .. "_yaw_base"].Value,
+					yaw_offset = Options["aa_" .. aaState .. "_yaw_offset"].Value,
+					jitter = Toggles["aa_" .. aaState .. "_jitter"].Value,
 					jitter_offset = Options["aa_" .. aaState .. "_jitter_offset"].Value,
-					jitter_speed  = Options["aa_" .. aaState .. "_jitter_speed"].Value,
-					spin_speed    = Options["aa_" .. aaState .. "_spin_speed"].Value,
-					body_roll     = Options["aa_" .. aaState .. "_body_roll"].Value,
+					jitter_speed = Options["aa_" .. aaState .. "_jitter_speed"].Value,
+					spin_speed = Options["aa_" .. aaState .. "_spin_speed"].Value,
+					body_roll = Options["aa_" .. aaState .. "_body_roll"].Value,
 				};
-				local currentTime = tick();
+				local currentTime = tick()
+				local dt = currentTime - (aaSmoothJitterState.lastTime or currentTime)
+				aaSmoothJitterState.lastTime = currentTime
+				dt = math.clamp(dt, 0.001, 0.05)
+
 				if ((currentTime - aalastjittertime[aaState]) >= (s.jitter_speed / 1000)) then
-					aajittertoggles[aaState] = not aajittertoggles[aaState];
-					aalastjittertime[aaState] = currentTime;
+					aajittertoggles[aaState] = not aajittertoggles[aaState]
+					aalastjittertime[aaState] = currentTime
 				end
-				aaspinangles[aaState] = aaspinangles[aaState] + math.rad(s.spin_speed * 0.1);
-				if (aaspinangles[aaState] > math.rad(360)) then aaspinangles[aaState] = 0; end
-				local angle = -math.atan2(camLook.Z, camLook.X) + math.rad(-90);
+
+				aaspinangles[aaState] = aaspinangles[aaState] + math.rad(s.spin_speed * 0.1)
+				if (aaspinangles[aaState] > math.rad(360)) then aaspinangles[aaState] = 0 end
+
+				local angle = -math.atan2(camLook.Z, camLook.X) + math.rad(-90)
 				if (s.yaw_base == "Spin") then
-					angle = angle + aaspinangles[aaState];
+					angle = angle + aaspinangles[aaState]
 				elseif (s.yaw_base == "Random") then
-					angle = angle + math.rad(math.random(0, 360));
+					angle = angle + math.rad(math.random(0, 360))
 				elseif (s.yaw_base == "Backward") then
-					angle = angle + math.rad(180);
+					angle = angle + math.rad(180)
 				elseif (s.yaw_base == "Targets") then
-					local closestPart = nil;
-					local closestDistance = 9999;
+					local closestPart = nil
+					local closestDistance = 9999
 					for _, player in pairs(players:GetPlayers()) do
 						if ((player ~= localPlayer) and player.Character and player.Character:FindFirstChild("Humanoid") and (player.Character.Humanoid.Health > 0) and (player.Team ~= localPlayer.Team)) then
-							local rootPart = player.Character:FindFirstChild("HumanoidRootPart");
+							local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
 							if rootPart then
-								local pos = currentCamera:WorldToViewportPoint(rootPart.Position);
-								local mousePos = userInput:GetMouseLocation();
-								local distance = (Vec2(pos.X, pos.Y) - Vec2(mousePos.X, mousePos.Y)).Magnitude;
+								local pos = currentCamera:WorldToViewportPoint(rootPart.Position)
+								local mousePos = userInput:GetMouseLocation()
+								local distance = (Vec2(pos.X, pos.Y) - Vec2(mousePos.X, mousePos.Y)).Magnitude
 								if (distance < closestDistance) then
-									closestPart = rootPart;
-									closestDistance = distance;
+									closestPart = rootPart
+									closestDistance = distance
 								end
 							end
 						end
 					end
 					if closestPart then
-						angle = -math.atan2((closestPart.Position - root.Position).Z, (closestPart.Position - root.Position).X) + math.rad(-90);
+						angle = -math.atan2((closestPart.Position - root.Position).Z, (closestPart.Position - root.Position).X) + math.rad(-90)
 					end
 				end
-				local jitterOffset = (s.jitter and aajittertoggles[aaState] and s.jitter_offset) or 0;
-				local offset = math.rad(-s.yaw_offset - jitterOffset);
+
+				local smoothOffset = getSmoothJitterOffset(aaState, dt)
+				local jitterOffset
+				if smoothOffset ~= nil then
+					jitterOffset = smoothOffset
+				else
+					jitterOffset = (s.jitter and aajittertoggles[aaState] and s.jitter_offset) or 0
+				end
+
+				local offset = math.rad(-s.yaw_offset - jitterOffset)
 				local targetCFrame = CF(root.Position) * CFrame.Angles(0, angle + offset, 0);
 				if (s.body_roll == "180") then
 					targetCFrame = targetCFrame * CFrame.Angles(math.rad(180), 0, 0);
