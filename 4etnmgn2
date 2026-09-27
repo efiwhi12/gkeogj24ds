@@ -1,4 +1,4 @@
--- скрипт паста ебанная я хз кто спастит в ответ тот сын шлюхи | t.me/oexcheats
+-- скрипт паста ебанная я хз кто спастит в ответ тот сын шлюхи | t.me/enderphobia133
 -- bypess aka cb hueta
 do
 	local originalNamecallMethod
@@ -52,8 +52,8 @@ local legAnimDone = false
 local nameChangerEnabled = false
 local clantagEnabled = false
 local originalName = localPlayer.Name
-getgenv().newname = "t.me/oexcheats"
-getgenv().clantag = "oexcheats"
+getgenv().newname = "t.me/enderphobia1337"
+getgenv().clantag = "ANYAGANG'"
 local atm = Instance.new("Atmosphere"); atm.Parent = nil; atm.Density = 0; atm.Offset = 0; atm.Haze = 0; atm.Glare = 0; atm.Color = C3(255, 255, 255); atm.Decay = C3(255, 255, 255)
 grenadenames = { ["Smoke Grenade"] = true, Flashbang = true, ["HE Grenade"] = true, Molotov = true, ["Incendiary Grenade"] = true, ["Decoy Grenade"] = true, Smoke = true, Flash = true, Grenade = true, Incendiary = true }
 -- fynkcions wathahell shto
@@ -1361,7 +1361,7 @@ end
 
 local UILibrary = {
 	Flags = Flags,
-	Directory = "OexcheatsHueta",
+	Directory = "Enderphobia",
 	OldConfig = {},
 }
 
@@ -1772,15 +1772,15 @@ function UILibrary:ConfigListUpdate()
 	SaveManager:SetLibrary(Library)
 	SaveManager:IgnoreThemeSettings()
 	SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
-	ThemeManager:SetFolder("OexcheatsHueta")
-	SaveManager:SetFolder("OexcheatsHueta/menu")
+	ThemeManager:SetFolder("Enderphobia")
+	SaveManager:SetFolder("Enderphobia/menu")
 	SaveManager:BuildConfigSection(UISettingsTab)
 	ThemeManager:ApplyToTab(UISettingsTab)
 	SaveManager:LoadAutoloadConfig()
 
 	if makefolder then
-		pcall(makefolder, "OexcheatsHueta")
-		pcall(makefolder, "OexcheatsHueta/lua")
+		pcall(makefolder, "Enderphobia")
+		pcall(makefolder, "Enderphobia/lua")
 	end
 end
 
@@ -2390,7 +2390,7 @@ local Columns = {
 }
 
 do
-	GlobalEnv.OexcheatsHueta = GlobalEvents
+	GlobalEnv.Enderphobia = GlobalEvents
 	GlobalEnv.RobloxObj = RenderObjectUtils
 	GlobalEnv.RemoteEvents = RemoteEvents
 	GlobalEnv.Library = UILibrary
@@ -3127,7 +3127,7 @@ do
 	RightSection:Toggle { Name = "Name Changer", Flag = "Misc/NameChanger", Default = false, Callback = function(val)
 		nameChangerEnabled = val
 	end }
-	RightSection:Input { Name = "Custom Name", Flag = "Misc/CustomName", Default = "t.me/oexcheats", Placeholder = "siski", Finished = false, Callback = function(val)
+	RightSection:Input { Name = "Custom Name", Flag = "Misc/CustomName", Default = "t.me/enderphobia1337", Placeholder = "siski", Finished = false, Callback = function(val)
 		getgenv().newname = val
 	end }
 	RightSection:Button { Name = "Apply Name", Callback = function()
@@ -3143,7 +3143,7 @@ do
 	RightSection:Toggle { Name = "Clantag", Flag = "Misc/Clantag", Default = false, Callback = function(val)
 		clantagEnabled = val
 	end }
-	RightSection:Input { Name = "Clantag Text", Flag = "Misc/ClantagText", Default = "oex", Placeholder = "siski", Finished = false, Callback = function(val)
+	RightSection:Input { Name = "Clantag Text", Flag = "Misc/ClantagText", Default = "ANYAGANG'", Placeholder = "siski", Finished = false, Callback = function(val)
 		getgenv().clantag = val
 	end }
 	RightSection:Button { Name = "Apply Clantag", Callback = function()
