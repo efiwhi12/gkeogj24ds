@@ -937,9 +937,9 @@ Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
 
 local ObsidianWindow = Library:CreateWindow({
-	Title = "LilithWare",
-	Footer = "t.me/LilithWare",
-	Icon = 118993630210337,
+	Title = "Enderphobia",
+	Footer = "t.me/Enderphobia1337",
+	Icon = 112012071630242,
 	NotifySide = "Right",
 	ShowCustomCursor = true,
 })
