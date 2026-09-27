@@ -2261,8 +2261,10 @@ local function applyCustomScopeSettings()
             f.BackgroundTransparency = 1
         end
     end
-    if customScope.originalValues.FOV then
-        workspace.Camera.FieldOfView = customScope.originalValues.FOV
+    if not Flags["Visuals/CustomScopeUseZoom"] then
+        if customScope.originalValues.FOV then
+            workspace.Camera.FieldOfView = customScope.originalValues.FOV
+        end
     end
 end
 
@@ -2339,8 +2341,10 @@ local function startScopeRender()
         if not crosshairs then return end
         local scopeFrame = crosshairs:FindFirstChild("Scope")
         if not scopeFrame then return end
-        if customScope.originalValues.FOV then
-            workspace.Camera.FieldOfView = customScope.originalValues.FOV
+        if not Flags["Visuals/CustomScopeUseZoom"] then
+            if customScope.originalValues.FOV then
+                workspace.Camera.FieldOfView = customScope.originalValues.FOV
+            end
         end
         local isScoped = scopeFrame.Visible
         if customScope.lineH then
@@ -2797,6 +2801,24 @@ do
 		toolToggle:Colorpicker { Name = "Tool Color", Default = Color3FromRGB(255, 255, 255), Flag = category .. "/ToolColor", Callback = function(color)
 			GlobalSignals.EspChanged:Fire(category .. "/ToolColor", color)
 		end }
+		local cashToggle = sectionObject:Toggle { Name = "Cash", Default = false, Flag = category .. "/Cash", Callback = function(state)
+			GlobalSignals.EspChanged:Fire(category .. "/Cash", state)
+		end }
+		cashToggle:Colorpicker { Name = "Cash Color", Default = Color3FromRGB(0, 180, 80), Flag = category .. "/CashColor", Callback = function(color)
+			GlobalSignals.EspChanged:Fire(category .. "/CashColor", color)
+		end }
+		local zoomToggle = sectionObject:Toggle { Name = "Zoom", Default = false, Flag = category .. "/Zoom", Callback = function(state)
+			GlobalSignals.EspChanged:Fire(category .. "/Zoom", state)
+		end }
+		zoomToggle:Colorpicker { Name = "Zoom Color", Default = Color3FromRGB(0, 180, 255), Flag = category .. "/ZoomColor", Callback = function(color)
+			GlobalSignals.EspChanged:Fire(category .. "/ZoomColor", color)
+		end }
+		local c4FlagToggle = sectionObject:Toggle { Name = "C4", Default = false, Flag = category .. "/C4Flag", Callback = function(state)
+			GlobalSignals.EspChanged:Fire(category .. "/C4Flag", state)
+		end }
+		c4FlagToggle:Colorpicker { Name = "C4 Flag Color", Default = Color3FromRGB(255, 50, 50), Flag = category .. "/C4FlagColor", Callback = function(color)
+			GlobalSignals.EspChanged:Fire(category .. "/C4FlagColor", color)
+		end }
 		sectionObject:ButtonHolder { "Health Bar" }
 		local healthBarToggle = sectionObject:Toggle { Name = "Health Bar", Default = false, Flag = category .. "/HealthBar", Callback = function(state)
 			GlobalSignals.EspChanged:Fire(category .. "/HealthBar", state)
@@ -2977,6 +2999,7 @@ do
 		GlobalConfig.FadeHitmarker = TweenInfo.new(value, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 	end }
 	UISection:Toggle { Name = "Custom Scope", Flag = "Visuals/CustomScope", Default = false }
+	UISection:Toggle { Name = "Use Zoom", Flag = "Visuals/CustomScopeUseZoom", Default = true }
 	UISection:ButtonHolder { "Indicators" }
 	UISection:Toggle { Name = "Indicators", Flag = "Visuals/Indicators", Default = false }
 	UISection:MultiDropdown {
@@ -3996,14 +4019,22 @@ do
 					Remove(item)
 				end
 			end
-			local backC4 = FindFirstChild(playerFolder, "BackC4")
-			if backC4 then Remove(backC4) end
 
 			local fakeHead = FindFirstChild(playerFolder, "FakeHead")
 			if fakeHead then
 				fakeHead.Transparency = 1
 				local fakeFace = FindFirstChild(fakeHead, "face")
 				if fakeFace then Remove(fakeFace) end
+			end
+
+			local backC4 = FindFirstChild(playerFolder, "BackC4")
+			if backC4 then
+				for _, part in ipairs(backC4:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.Material = Enum.Material.Neon
+						part.Color = chamColor
+					end
+				end
 			end
 
 			for _, handName in ipairs({"LeftHand", "RightHand"}) do
@@ -4295,6 +4326,20 @@ do
 			toolLabel.Visible = Flags[category .. "/Tool"]
 			toolLabel.TextColor3 = Flags[category .. "/ToolColor"] and Flags[category .. "/ToolColor"].Color or Color3FromRGB(255, 255, 255)
 			GlobalState.Esp.ApplyTextLabel(toolLabel)
+		end
+
+		do
+			local cashLabel = objects.Cash
+			cashLabel.Visible = Flags[category .. "/Cash"]
+			cashLabel.TextColor3 = Flags[category .. "/CashColor"] and Flags[category .. "/CashColor"].Color or Color3FromRGB(0, 180, 80)
+
+			local zoomLabel = objects.Zoom
+			zoomLabel.Visible = Flags[category .. "/Zoom"]
+			zoomLabel.TextColor3 = Flags[category .. "/ZoomColor"] and Flags[category .. "/ZoomColor"].Color or Color3FromRGB(0, 180, 255)
+
+			local c4FlagLabel = objects.C4Flag
+			c4FlagLabel.Visible = Flags[category .. "/C4Flag"]
+			c4FlagLabel.TextColor3 = Flags[category .. "/C4FlagColor"] and Flags[category .. "/C4FlagColor"].Color or Color3FromRGB(255, 50, 50)
 		end
 
 		do
@@ -4669,7 +4714,7 @@ do
 		noFadeObjects.Bottom = objects.SideBottom
 		noFadeObjects.Top = objects.SideTop
 		RenderObjectUtils.new("UIListLayout", { Parent = objects.SideLeft, HorizontalAlignment = "Right", Padding = NewUDim(0, 1) })
-		RenderObjectUtils.new("UIListLayout", { Parent = objects.SideRight, HorizontalAlignment = "Left", Padding = NewUDim(0, 1) })
+		RenderObjectUtils.new("UIListLayout", { Parent = objects.SideRight, HorizontalAlignment = "Left", Padding = NewUDim(0, -1) })
 		RenderObjectUtils.new("UIListLayout", { Parent = objects.SideBottom, HorizontalAlignment = "Center", VerticalAlignment = "Top", Padding = NewUDim(0, 1) })
 		RenderObjectUtils.new("UIListLayout", { Parent = objects.SideTop, HorizontalAlignment = "Center", Padding = NewUDim(0, 1), VerticalAlignment = "Bottom" })
 
@@ -4728,6 +4773,35 @@ do
 		})
 		objects.ToolOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.Tool, Thickness = 1, Color = Color3FromRGB(0, 0, 0), LineJoinMode = "Miter" })
 		GlobalState.Esp.FixTextPadding(objects.Tool)
+		objects.Cash = RenderObjectUtils.new("TextLabel", {
+			Text = "$0",
+			Font = 4,
+			TextSize = 9,
+			Parent = objects.SideRight,
+			TextColor3 = Color3FromRGB(0, 180, 80),
+		})
+		objects.CashOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.Cash, Thickness = 1, Color = Color3FromRGB(0, 0, 0), LineJoinMode = "Miter" })
+		GlobalState.Esp.FixTextPadding(objects.Cash)
+
+		objects.Zoom = RenderObjectUtils.new("TextLabel", {
+			Text = "ZOOM",
+			Font = 4,
+			TextSize = 9,
+			Parent = objects.SideRight,
+			TextColor3 = Color3FromRGB(0, 180, 255),
+		})
+		objects.ZoomOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.Zoom, Thickness = 1, Color = Color3FromRGB(0, 0, 0), LineJoinMode = "Miter" })
+		GlobalState.Esp.FixTextPadding(objects.Zoom)
+
+		objects.C4Flag = RenderObjectUtils.new("TextLabel", {
+			Text = "C4",
+			Font = 4,
+			TextSize = 9,
+			Parent = objects.SideRight,
+			TextColor3 = Color3FromRGB(255, 50, 50),
+		})
+		objects.C4FlagOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.C4Flag, Thickness = 1, Color = Color3FromRGB(0, 0, 0), LineJoinMode = "Miter" })
+		GlobalState.Esp.FixTextPadding(objects.C4Flag)
 
 		objects.HealthBarHolder = RenderObjectUtils.new("Frame", {
 			Visible = true,
@@ -4968,6 +5042,42 @@ do
 					end
 				end
 
+				do
+					local cashLabel = objects.Cash
+					if cashLabel.Visible then
+						local ok, cash = pcall(function()
+							return Players:FindFirstChild(player.Name) and Players[player.Name].Cash and Players[player.Name].Cash.Value or 0
+						end)
+						local cashText = "$" .. tostring(ok and cash or 0)
+						if cashLabel.Text ~= cashText then
+							cashLabel.Text = cashText
+							GlobalState.Esp.FixTextPadding(cashLabel)
+						end
+					end
+
+					local zoomLabel = objects.Zoom
+					if Flags[category .. "/Zoom"] then
+						local ok, isADS = pcall(function()
+							local plrFolder = workspace:FindFirstChild(player.Name)
+							local ads = plrFolder and plrFolder:FindFirstChild("ADS")
+							return ads and (ads.Value == true) or false
+						end)
+						zoomLabel.Visible = ok and isADS or false
+					end
+
+					local c4FlagLabel = objects.C4Flag
+					if Flags[category .. "/C4Flag"] then
+						local ok, hasC4 = pcall(function()
+							local plrFolder = workspace:FindFirstChild(player.Name)
+							local backC4 = plrFolder and plrFolder:FindFirstChild("BackC4")
+							if not backC4 then return false end
+							local part = backC4:FindFirstChildWhichIsA("BasePart") or backC4
+							return part.Transparency == 0
+						end)
+						c4FlagLabel.Visible = ok and hasC4 or false
+					end
+				end
+
 				if Flags["Esp/FadeOnDistance"] then
 					local fadeStart = maxDistance * 0.6
 					local fadeAlpha = MathClamp((distance - fadeStart) / (maxDistance - fadeStart), 0, 1)
@@ -5126,6 +5236,16 @@ do
 		end
 	end)
 end
+
+Toggles[SanitizeFlag("Visuals/CustomScopeUseZoom")]:OnChanged(function()
+    if customScope.enabled then
+        if not Flags["Visuals/CustomScopeUseZoom"] then
+            if customScope.originalValues.FOV then
+                workspace.Camera.FieldOfView = customScope.originalValues.FOV
+            end
+        end
+    end
+end)
 
 Toggles[SanitizeFlag("Visuals/CustomScope")]:OnChanged(function()
     customScope.enabled = Flags["Visuals/CustomScope"]
@@ -6138,21 +6258,6 @@ do
 						rayParams.FilterDescendantsInstances = { LocalPlayer.Character, CurrentCamera }
 						rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
-						local traveled = 0
-						local maxPenetrations = 1
-
-						for i = 1, maxPenetrations do
-							local result = workspace:Raycast(origin + unitDir * traveled, unitDir * (distance - traveled), rayParams)
-							if not result then break end
-
-							GlobalState.Visuals.Functions.CreateBulletImpact(result.Position)
-
-							traveled = (result.Position - origin).Magnitude + 0.1
-							if traveled >= distance then break end
-
-							rayParams:AddToFilter(result.Instance)
-						end
-
 						GlobalState.Visuals.Functions.CreateBulletImpact(endPos)
 					end)
 				end
@@ -6817,7 +6922,7 @@ runService.Heartbeat:Connect(function()
                     localPlayer.Character.Gun.Shoot.Value = "rbxassetid://347270113"
                 elseif equippedTool.Value == "M4A4" then
                     localPlayer.Character.Gun.Shoot.Value = "rbxassetid://202918741"
-				        elseif equippedTool.Value == "Scout" then
+				elseif equippedTool.Value == "Scout" then
                     localPlayer.Character.Gun.Shoot.Value = "rbxassetid://81899527007318"
                 elseif equippedTool.Value == "Tec9" then
                     localPlayer.Character.Gun.Shoot.Value = "rbxassetid://206953317"
