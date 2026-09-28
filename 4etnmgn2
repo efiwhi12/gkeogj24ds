@@ -954,7 +954,6 @@ local TabIcons = {
 	Esp = "user",
 	Visuals = "earth",
 	Skins = "palette",
-	Extra = "folder",
 	["UI Settings"] = "settings",
 }
 
@@ -2369,7 +2368,7 @@ local function stopScopeRender()
     end
 end
 
-local MainWindow = UILibrary:Window { name = "LilithWare", Icon = 118993630210337 }
+local MainWindow = UILibrary:Window { name = "Enderphobia", Icon = 112012071630242 }
 local Tabs = {
 	[1] = { Name = "RageBot", Object = MainWindow:Tab { name = "Rage",  } },
 	[6] = { Name = "LegitBot", Object = MainWindow:Tab { name = "LegitBot" } },
@@ -2377,7 +2376,6 @@ local Tabs = {
 	[4] = { Name = "Visuals", Object = MainWindow:Tab { name = "Visuals" } },
 	[2] = { Name = "Misc", Object = MainWindow:Tab { name = "Misc" } },
 	[7] = { Name = "Skins", Object = MainWindow:Tab { name = "Skins" } },
-	[5] = { Name = "Extra", Object = MainWindow:Tab { name = "Extra" } },
 }
 local Columns = {
 	[1] = { Name = "RageBot", Left = Tabs[1].Object:Column(), Right = Tabs[1].Object:Column() },
@@ -2386,7 +2384,6 @@ local Columns = {
 	[4] = { Name = "Visuals", Left = Tabs[4].Object:Column(), Right = Tabs[4].Object:Column() },
 	[2] = { Name = "Misc", Left = Tabs[2].Object:Column(), Right = Tabs[2].Object:Column() },
 	[7] = { Name = "Skins", Left = Tabs[7].Object:Column(), Right = Tabs[7].Object:Column() },
-	[5] = { Name = "Extra", Left = Tabs[5].Object:Column(), Right = Tabs[5].Object:Column() },
 }
 
 do
@@ -2405,7 +2402,7 @@ do
 	local LeftSection = LeftColumn:Section { Name = "Main" }
 	local RightSection = RightColumn:Section { Name = "Rage" }
 
-	LeftSection:Toggle { Name = "Enabled", Flag = "Rage/Enabled" }
+	LeftSection:Toggle { Name = "Enabled", Flag = "Rage/Enabled" }:Keybind { Name = "RageBot", Flag = "Rage/EnabledKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
 	LeftSection:Toggle { Name = "Multi Target", Flag = "Rage/MultiTarget" }
 	LeftSection:Toggle { Name = "Use Custom Weapon", Flag = "Rage/UseCustomWeapon" }
 	LeftSection:Dropdown { Name = "Custom Weapon List", Items = { "AK-47", "AWP" }, Flag = "Rage/CustomWeaponList", Default = "AK-47" }
@@ -2436,6 +2433,124 @@ do
 end
 
 do
+    local ups = debug.getupvalues(GlobalState.ClientScript.Button2Down)
+    local v5 = ups[2]
+
+    local skipEffects = false
+
+    local originalTrail = GlobalState.ClientScript.createtrail
+    GlobalState.ClientScript.createtrail = function(...)
+        if not skipEffects then originalTrail(...) end
+    end
+
+    local originalBullethole = GlobalState.ClientScript.createbullethole
+    GlobalState.ClientScript.createbullethole = function(...)
+        if not skipEffects then originalBullethole(...) end
+    end
+
+    local LegitBot = {
+        LastShot = 0,
+        Debounce = false,
+    }
+
+    local LeftColumn = Columns[6].Left
+    local LegitSection = LeftColumn:Section { Name = "LegitBot" } 
+	LegitSection:Toggle { Name = "Enabled", Flag = "Legit/Enabled", Default = false }:Keybind { Name = "LegitBot", Flag = "Legit/EnabledKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
+    LegitSection:Slider { Name = "Delay (ms)", Default = 0, Min = 0, Max = 500, Flag = "Legit/Delay", Interval = 1, Suffix = "ms" }
+    LegitSection:Toggle { Name = "Auto Wall", Flag = "Legit/AutoWall", Default = false }
+	LegitSection:Slider { Name = "Auto Wall Max Walls", Default = 1, Min = 1, Max = 4, Flag = "Legit/AutoWallMaxWalls", Interval = 1 }
+    LegitSection:Dropdown { Name = "Hitbox", Items = { "Head", "UpperTorso" }, Flag = "Legit/Hitbox", Default = "Head" }
+	LegitSection:Toggle { Name = "Rotate Camera", Flag = "Legit/RotateCamera", Default = false }
+
+    local function LegitGetTarget()
+		local closest = nil
+		local closestDist = math.huge
+
+		for _, plr in ipairs(GetPlayers(Players)) do
+			if plr == LocalPlayer then continue end
+			if GlobalState.Utility.GetTeam(plr) == GlobalState.Utility.GetTeam(LocalPlayer) then continue end
+
+			local status = plr:FindFirstChild("Status")
+			if not status or not status.Alive or not status.Alive.Value then continue end
+
+			local char = plr.Character
+			if not char then continue end
+
+			local hitbox = char:FindFirstChild(Flags["Legit/Hitbox"] or "Head")
+			if not hitbox then continue end
+
+			if not Flags["Legit/AutoWall"] then
+				local params = RaycastParams.new()
+				params.FilterType = Enum.RaycastFilterType.Exclude
+				params.FilterDescendantsInstances = { LocalPlayer.Character, CurrentCamera }
+				local result = Workspace:Raycast(CurrentCamera.CFrame.Position, (hitbox.Position - CurrentCamera.CFrame.Position).Unit * 1000, params)
+				if not result or not result.Instance or not result.Instance:IsDescendantOf(char) then continue end
+			end
+
+			local dist = (hitbox.Position - CurrentCamera.CFrame.Position).Magnitude
+			if dist < closestDist then
+				closest = { Player = plr, Part = hitbox }
+				closestDist = dist
+			end
+		end
+
+		return closest
+	end
+
+    local function LegitThink()
+        if not Flags["Legit/Enabled"] then return end
+        if LegitBot.Debounce then return end
+
+        local fgun = GlobalState.ClientScript.fgun
+        if not fgun or fgun == "none" then return end
+        if FindFirstChild(fgun, "Grenade") or FindFirstChild(fgun, "Stab") or fgun.Name == "C4" then return end
+
+        local fireRate = fgun.FireRate and fgun.FireRate.Value or 0.1
+        local now = tick()
+        if now - LegitBot.LastShot < fireRate then return end
+
+        local target = LegitGetTarget()
+        if not target then return end
+
+		local ammoTable = GlobalState.GarbageCollector.StatusTable
+		if not ammoTable or (ammoTable.ammocount or 0) <= 0 then return end
+
+        if Flags["Legit/AutoWall"] then
+            local penValue = fgun.Penetration and fgun.Penetration.Value or 100
+            local success = GlobalState.RageBot.Functions.WallBang(CurrentCamera.CFrame.Position, target.Part.Position, penValue, Flags["Legit/AutoWallMaxWalls"] or 1)
+            if not success then return end
+        end
+		
+        LegitBot.Debounce = true
+
+        local delay = (Flags["Legit/Delay"] or 0) / 1000
+        if delay > 0 then task.wait(delay) end
+
+		skipEffects = true
+		v5.Held = true
+		task.wait(0.08)
+		v5.Held = false
+		skipEffects = false
+
+		if Flags["Legit/RotateCamera"] then
+			local targetPos = target.Part.Position
+			local camPos = CurrentCamera.CFrame.Position
+			CurrentCamera.CFrame = CFrame.lookAt(camPos, camPos + (targetPos - camPos).Unit)
+		end
+
+		if not target.Player.Character then return end
+		GlobalState.RageBot.Functions.HitPart(target.Player, Flags["Legit/Hitbox"] or "Head", fgun.Name, 1)
+
+        LegitBot.LastShot = tick()
+        LegitBot.Debounce = false
+    end
+
+    RunService.RenderStepped:Connect(function()
+        TaskSpawn(LegitThink)
+    end)
+end
+
+do
     if not GlobalState.AimAssist then
         GlobalState.AimAssist = { Functions = {} }
     end
@@ -2445,7 +2560,7 @@ do
 
     local MainSection = LeftColumn:Section { Name = "Aim Assist" }
 
-    MainSection:Toggle { Name = "Enabled", Flag = "AimAssist/Enabled", Default = false }
+	MainSection:Toggle { Name = "Enabled", Flag = "AimAssist/Enabled", Default = false }:Keybind { Name = "AimAssist", Flag = "AimAssist/EnabledKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
 	MainSection:ButtonHolder { "Settings" }
     MainSection:Slider { Name = "Smoothing", Flag = "AimAssist/Smoothing", Default = 10, Min = 0, Max = 100, Interval = 1 }
     MainSection:Toggle { Name = "Team Check", Flag = "AimAssist/TeamCheck", Default = false }
@@ -2623,7 +2738,7 @@ do
 
     do
         local TriggerbotSection = Columns[6].Right:Section { Name = "Triggerbot" }
-        TriggerbotSection:Toggle { Name = "Enabled", Flag = "Triggerbot/Enabled", Default = false }
+		TriggerbotSection:Toggle { Name = "Enabled", Flag = "Triggerbot/Enabled", Default = false }:Keybind { Name = "Triggerbot", Flag = "Triggerbot/EnabledKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
 		TriggerbotSection:ButtonHolder { "Settings" }
         TriggerbotSection:Slider { Name = "Delay (ms)", Default = 100, Min = 0, Max = 1500, Flag = "Triggerbot/Delay", Interval = 1, Suffix = "ms" }
         TriggerbotSection:Toggle { Name = "Team Check", Flag = "Triggerbot/TeamCheck", Default = false }
@@ -2751,7 +2866,7 @@ do
 		elseif sectionIndex == 2 then
 			category = "Team"
 		end
-		sectionObject:Toggle { Name = "Enabled", Default = false, Flag = category .. "/Enabled" }
+		sectionObject:Toggle { Name = "Enabled", Default = false, Flag = category .. "/Enabled" }:Keybind { Name = "ESP", Flag = category .. "/EnabledKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
 		sectionObject:ButtonHolder { "Box" }
 		local boxToggle = sectionObject:Toggle { Name = "Box", Default = false, Flag = category .. "/Box", Callback = function(state)
 			GlobalSignals.EspChanged:Fire(category .. "/Box", state)
@@ -3021,10 +3136,8 @@ do
 
 	local BulletSection = RightColumn:Section { Name = "Bullets and other" }
 
-	BulletSection:Toggle { Name = "Bullet Tracer", Flag = "Visuals/BulletTracer" }
+	BulletSection:Toggle { Name = "Bullet Tracer", Flag = "Visuals/BulletTracer" }:Colorpicker { Name = "Tracer Color", Color = Color3FromRGB(255, 255, 255), Flag = "Visuals/BulletTracerColor" }
 	BulletSection:Slider { Name = "Tracer Life Time", Default = 2, Min = 1, Max = 10, Flag = "Visuals/BulletTracerTime", Interval = 1 }
-	local btColorToggle = BulletSection:Toggle { Name = "Tracer Color", Flag = "Visuals/BulletTracerColorToggle" }
-	btColorToggle:Colorpicker { Name = "Tracer Color", Color = Color3FromRGB(255, 0, 0), Flag = "Visuals/BulletTracerColor" }
 	BulletSection:Dropdown {
 		Name = "Tracer Texture",
 		Items = { "Lightning", "Laser 1", "Laser 2", "Energy", "Unnamed" },
@@ -3032,13 +3145,10 @@ do
 		Default = "Lightning",
 	}
 	BulletSection:ButtonHolder { "Impacts" }
-	BulletSection:Toggle { Name = "Bullet Impact", Flag = "Visuals/BulletImpact" }
-	local biColorToggle = BulletSection:Toggle { Name = "Impact Color", Flag = "Visuals/BulletImpactColorToggle" }
-	biColorToggle:Colorpicker { Name = "Impact Color", Color = Color3FromRGB(0, 0, 255), Flag = "Visuals/BulletImpactColor" }
+	BulletSection:Toggle { Name = "Bullet Impact", Flag = "Visuals/BulletImpact" }:Colorpicker { Name = "Impact Color", Color = Color3FromRGB(255, 255, 255), Flag = "Visuals/BulletImpactColor" }
 	BulletSection:Slider { Name = "Impact Life Time", Default = 3, Min = 1, Max = 10, Flag = "Visuals/BulletImpactTime", Interval = 1 }
 	BulletSection:ButtonHolder { "Hit Chams" }
-	local hitChamsToggle = BulletSection:Toggle { Name = "Hit Chams", Flag = "Visuals/HitChams", Default = false }
-	hitChamsToggle:Colorpicker { Name = "Hit Color", Color = Color3FromRGB(255, 255, 255), Flag = "Visuals/HitChamsColor" }
+	local hitChamsToggle = BulletSection:Toggle { Name = "Hit Chams", Flag = "Visuals/HitChams", Default = false }:Colorpicker { Name = "Hit Color", Color = Color3FromRGB(255, 255, 255), Flag = "Visuals/HitChamsColor" }
 	BulletSection:Slider { Name = "Hit Life Time", Default = 3, Min = 1, Max = 10, Flag = "Visuals/HitChamsTime", Interval = 1 }
 	BulletSection:Slider { Name = "Hit Chams Transparency", Default = 0.5, Min = 0, Max = 1, Flag = "Visuals/HitChamsTransparency", Interval = 0.01 }
 
@@ -3097,13 +3207,13 @@ do
 	local RightSection = RightColumn:Section { Name = "Misc" }
 	local AntiAimSection = RightColumn:Section { Name = "Anti-Popadalki" }
 
-	LeftSection:Toggle { Name = "Speed", Flag = "Misc/Speed" }
+	LeftSection:Toggle { Name = "Speed", Flag = "Misc/Speed" }:Keybind { Name = "Speed", Flag = "Misc/SpeedKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
 	LeftSection:Slider { Name = "Speed Value", Flag = "Misc/SpeedValue", Default = 16, Min = 16, Max = 900 }
 	LeftSection:Toggle { Name = "Override Speed", Flag = "Misc/OverrideSpeed" }:Keybind { Name = "Override Key", Active = false, Mode = "hold", Key = Enum.KeyCode.LeftShift, Flag = "Misc/OverrideSpeedKey" }
 	LeftSection:Slider { Name = "Override Speed Value", Flag = "Misc/OverrideSpeedValue", Default = 16, Min = 16, Max = 900 }
-	LeftSection:Toggle { Name = "Auto Jump", Flag = "Misc/AutoJump" }
+	LeftSection:Toggle { Name = "Auto Jump", Flag = "Misc/AutoJump" }:Keybind { Name = "Auto Jump", Flag = "Misc/AutoJumpKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
 
-	RightSection:Toggle { Name = "Kill All", Flag = "Misc/KillAll" }
+	RightSection:Toggle { Name = "Kill All", Flag = "Misc/KillAll" }:Keybind { Name = "Kill All", Flag = "Misc/KillAllKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
 	RightSection:Toggle { Name = "Kill All Preparation Check", Flag = "Misc/KillAllPrepCheck" }
 	RightSection:Toggle { Name = "Kill All Time Offset", Flag = "Misc/KillAllTimeOffset" }
 	RightSection:Slider { Name = "Kill All Time Offset Value", Default = 1, Min = 1, Max = 1000, Flag = "Misc/KillAllTimeOffsetValue", Interval = 1, Suffix = "ms" }
@@ -3209,12 +3319,12 @@ do
 		end);
 		depBox:SetupDependencies({{Options[dropdownKey], dropdownValue}});
 	end
-	AntiAimSection:Toggle({Flag="antiaim_enabled", Name="Enabled", Default=false});
+	AntiAimSection:Toggle({Flag="antiaim_enabled", Name="Enabled", Default=false}):Keybind { Name = "Anti-Aim", Flag = "antiaim_enabledKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
 	AntiAimSection:Dropdown({Flag="antiaim_edit_state", Name="Edit State", Default="Standing", Items=aastates});
 	addAaDepBox(AntiAimSection, "Standing", "antiaim_edit_state", "Standing");
-	addAaDepBox(AntiAimSection, "Moving",   "antiaim_edit_state", "Moving");
-	addAaDepBox(AntiAimSection, "Crouch",   "antiaim_edit_state", "Crouch");
-	addAaDepBox(AntiAimSection, "Jumping",  "antiaim_edit_state", "Jumping");
+	addAaDepBox(AntiAimSection, "Moving", "antiaim_edit_state", "Moving");
+	addAaDepBox(AntiAimSection, "Crouch", "antiaim_edit_state", "Crouch");
+	addAaDepBox(AntiAimSection, "Jumping", "antiaim_edit_state", "Jumping");
 	addAaDepBox(AntiAimSection, "SlowWalk", "antiaim_edit_state", "SlowWalk");
 	for _, stateName in ipairs(aastates) do
 		if Options["aa_" .. stateName .. "_pitch"] then
@@ -3572,51 +3682,6 @@ do
     
     task.wait(1)
     pcall(setupInventoryUnlock)
-end
-
-do
-	local LeftColumn = Columns[5].Left
-	local RightColumn = Columns[5].Right
-
-	local LuaScriptsFolder = UILibrary.Directory .. "/lua"
-
-	local LuaSection = LeftColumn:Section { Name = "Luas" }
-	local LuaScriptsList = LuaSection:List { Name = "Lua Scripts", Items = GetFilesName(listfiles(LuaScriptsFolder)), Flag = "Extra/LuaScript" }
-	LuaSection:ButtonHolder {}
-	LuaSection:Button { Name = "Load Lua Scripts", Callback = function()
-		if Flags["Extra/LuaScript"] == nil then
-			UILibrary:Notification { Text = "Please select a Lua script to load." }
-			return
-		end
-		local success, result = pcall(loadstring, readfile(LuaScriptsFolder .. "/" .. Flags["Extra/LuaScript"]))
-		if not success then
-			UILibrary:Notification { Text = "Failed to load Lua script, errors will be displayed in the console." }
-			warn(result)
-		else
-			local execSuccess, execResult = pcall(result)
-			if not execSuccess then
-				UILibrary:Notification { Text = "Lua script errored, errors will be displayed in the console." }
-				warn(execResult)
-			else
-				UILibrary:Notification { Text = "Successfully loaded Lua script." }
-				for presetName, presetTable in UIPresets.Preset do
-					pcall(function()
-						UILibrary:UpdateTheme(presetName, presetTable)
-					end)
-				end
-			end
-		end
-	end }
-	LuaSection:Button { Name = "Reload Lua Scripts", Callback = function()
-		local success = pcall(function()
-			LuaScriptsList.RefreshOptions(GetFilesName(listfiles(LuaScriptsFolder)))
-		end)
-		if not success then
-			UILibrary:Notification { Text = "Failed to reload Lua scripts." }
-		else
-			UILibrary:Notification { Text = "Successfully reloaded Lua scripts." }
-		end
-	end }
 end
 
 do
@@ -4063,16 +4128,22 @@ do
 	end
 
 	local function globalChamsUpdateAll()
-		if not Flags["GlobalChams/Enabled"] then
-			for _, player in GetPlayers(players) do
-				local character = player.Character
-				if character then
-					globalChamsResetCharacter(character)
+		local enabled = Flags["GlobalChams/Enabled"]
+		
+		if not enabled then
+			if chamsWasEnabled then
+				for _, player in GetPlayers(players) do
+					local character = player.Character
+					if character then
+						globalChamsResetCharacter(character)
+					end
 				end
+				chamsWasEnabled = false
 			end
 			return
 		end
 
+		chamsWasEnabled = true
 		for _, player in GetPlayers(players) do
 			globalChamsApplyToPlayer(player)
 		end
@@ -5363,10 +5434,8 @@ do
 					0,
 					moveDirection.Z * targetSpeed
 				)
-				bv.Enabled = true
 			else
 				bv.Velocity = NewVector3(0, 0, 0)
-				bv.Enabled = false
 			end
 		else
 			local bv = rootPart:FindFirstChild("SpeedBodyVelocity")
@@ -5555,6 +5624,7 @@ do
 		local gun = FindFirstChild(LocalPlayer.Character, "Gun")
 		local targetPart = FindFirstChild(targetPlayer.Character, hitboxName or "Head")
 		local isJumpingOrFalling = (GlobalState.Utility.IsJumpingOrFalling() or false)
+		if not targetPart then return end
 		local encodedPos = GlobalState.Utility.EncodePosition(targetPart.Position)
 
 		HitPartRemote:FireServer(
@@ -6795,6 +6865,7 @@ do
     local neckC0 = CFrame.new(-5.96046448e-08, 0.799999952, 1.1920929e-07, 1, 0, 0, 0, 1, 0, 0, 0, 1)
 
     RunService.RenderStepped:Connect(function()
+		if not antiaim.enabled then return end
         local char = LocalPlayer.Character
         if not char then return end
         
