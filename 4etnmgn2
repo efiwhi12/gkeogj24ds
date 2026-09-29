@@ -1,5 +1,16 @@
 -- скрипт паста ебанная я хз кто спастит в ответ тот сын шлюхи | t.me/enderphobia1337
 -- bypess aka cb hueta
+-- проверка на пидорасов
+if identifyexecutor then
+    local name = identifyexecutor()
+    local n = tostring(name):lower()
+    if n:find("solara") or n:find("xeno") or n:find("delta") or n:find("codex") or n:find("vega") then
+        game:GetService("Players").LocalPlayer:Kick(tostring(name) .. " dont support")
+    end
+else
+    print("иди нахуй")
+end
+
 do
 	local originalNamecallMethod
 	originalNamecallMethod = hookmetamethod(game, "__namecall", function(self, ...)
