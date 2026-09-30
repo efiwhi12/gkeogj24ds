@@ -2,7 +2,7 @@
 if identifyexecutor then
     local name = identifyexecutor()
     local n = tostring(name):lower()
-    if n:find("solara") or n:find("xeno") or n:find("delta") or n:find("codex") or n:find("vega") then
+    if n:find("solara") or n:find("xeno") or n:find("codex") or n:find("vega") then
         game:GetService("Players").LocalPlayer:Kick(tostring(name) .. " dont support")
     end
 else
