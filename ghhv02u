@@ -1,0 +1,3096 @@
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ForceCheckbox = false
+Library.ShowToggleFrameInKeybinds = true
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+
+local LocalPlayer = Players.LocalPlayer
+local CurrentCamera = Workspace.CurrentCamera
+local UIHolder = gethui() or game:GetService("CoreGui")
+
+local function LoadFont(name, url)
+    writefile(name .. ".ttf", game:HttpGet(url))
+    local cfg = { Name = name, faces = { { name = "Regular", weight = 400, style = "normal", assetId = getcustomasset(name .. ".ttf") } } }
+    writefile(name .. ".json", HttpService:JSONEncode(cfg))
+    return Font.new(getcustomasset(name .. ".json"), Enum.FontWeight.Regular)
+end
+
+local SmallestPixel7 = LoadFont("smallestpixel7", "https://raw.githubusercontent.com/mental1illness/storage/refs/heads/main/fonts/smallest_pixel-7.ttf")
+
+local function BuildMainUI()
+    local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+    local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+    local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+    local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+    local Options = Library.Options
+    local Toggles = Library.Toggles
+
+    Library.ForceCheckbox = false
+    Library.ShowToggleFrameInKeybinds = true
+
+    local Window = Library:CreateWindow({
+        Title = "Enderphobia",
+        Footer = "t.me/Enderphobia1337 | t.me/Enderphobia1337 | t.me/Enderphobia1337",
+        Icon = 112012071630242,
+        NotifySide = "Right",
+        ShowCustomCursor = true,
+    })
+
+    local Tabs = {
+        Main = Window:AddTab("Esp", "user"),
+        Teleports = Window:AddTab("Teleports", "diamond"),
+        Movement = Window:AddTab("Movement", "activity"),
+        Misc = Window:AddTab("Misc", "box"),
+        World = Window:AddTab("World", "globe"),
+        ["UI Settings"] = Window:AddTab("Settings", "settings"),
+    }
+
+    local EspTab = Tabs.Main
+    local LeftGroup = EspTab:AddLeftGroupbox("Players")
+    local RightGroup = EspTab:AddRightGroupbox("Esp Settings")
+    local ItemESPGroup = EspTab:AddRightGroupbox("Items")
+    local MercLeftGroup = EspTab:AddLeftGroupbox("Mercenaries")
+    local MovementL = Tabs.Movement:AddLeftGroupbox('Movement')
+    local MovementR = Tabs.Movement:AddRightGroupbox('Other')
+
+    MovementR:AddToggle('mov_fly', { Text = 'Fly', Default = false })
+        :AddKeyPicker('mov_flyBind', { Default = 'None', SyncToggleState = true, Mode = 'Toggle', Text = 'Fly', NoUI = false })
+
+    MovementR:AddSlider('mov_flyspeed', {
+        Text = 'Fly Speed',
+        Default = 50,
+        Min = 1,
+        Max = 500,
+        Rounding = 0,
+    })
+
+    MovementR:AddToggle('mov_noclip', { Text = 'Noclip', Default = false })
+        :AddKeyPicker('mov_noclipBind', { Default = 'None', SyncToggleState = true, Mode = 'Toggle', Text = 'Noclip', NoUI = false })
+
+    -- Fly
+    local flyBV, flyBG, flyConn
+    local UIS = game:GetService('UserInputService')
+
+    Toggles['mov_fly']:OnChanged(function(v)
+        local char = LocalPlayer.Character
+        if not char then return end
+        local hrp = char:FindFirstChild('HumanoidRootPart')
+        if not hrp then return end
+
+        if v then
+            flyBV = Instance.new('BodyVelocity')
+            flyBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            flyBV.Velocity = Vector3.zero
+            flyBV.Parent = hrp
+
+            flyBG = Instance.new('BodyGyro')
+            flyBG.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            flyBG.P = 10000
+            flyBG.D = 100
+            flyBG.CFrame = hrp.CFrame
+            flyBG.Parent = hrp
+
+            flyConn = RunService.RenderStepped:Connect(function()
+                local cam = workspace.CurrentCamera
+                local speed = Options['mov_flyspeed'].Value
+                local move = Vector3.zero
+
+                if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0, 1, 0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0, 1, 0) end
+
+                if move.Magnitude > 0 then
+                    flyBV.Velocity = move.Unit * speed
+                else
+                    flyBV.Velocity = Vector3.zero
+                end
+                flyBG.CFrame = cam.CFrame
+            end)
+        else
+            if flyConn then flyConn:Disconnect() flyConn = nil end
+            if flyBV then flyBV:Destroy() flyBV = nil end
+            if flyBG then flyBG:Destroy() flyBG = nil end
+        end
+    end)
+
+    -- Noclip
+    local noclipConn
+    Toggles['mov_noclip']:OnChanged(function(v)
+        if v then
+            noclipConn = RunService.Stepped:Connect(function()
+                local char = LocalPlayer.Character
+                if char then
+                    for _, part in ipairs(char:GetDescendants()) do
+                        if part:IsA('BasePart') and part.CanCollide then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        else
+            if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+        end
+    end)
+
+    local WorldLeft  = Tabs.World:AddLeftGroupbox("Lighting")
+    local WorldRight = Tabs.World:AddRightGroupbox("Effects")
+    local WorldTrail = Tabs.World:AddRightGroupbox("Trail")
+    local MagicBulletGroup = Tabs.World:AddLeftGroupbox("Magic Bullets")
+
+    local OriginalAmbient = Lighting.Ambient
+    local OriginalOutdoorAmbient = Lighting.OutdoorAmbient
+    local OriginalTimeOfDay = Lighting.TimeOfDay
+
+    local OriginalSky = Lighting:FindFirstChildOfClass("Sky")
+
+    local Atmosphere = Instance.new("Atmosphere")
+    Atmosphere.Density = 0
+    Atmosphere.Offset  = 0
+    Atmosphere.Haze    = 0
+    Atmosphere.Glare   = 0
+    Atmosphere.Color   = Color3.fromRGB(199,199,199)
+    Atmosphere.Decay   = Color3.fromRGB(199,199,199)
+    Atmosphere.Parent  = nil
+
+    local SaturationEffect = Instance.new("ColorCorrectionEffect")
+    SaturationEffect.Enabled = false
+    SaturationEffect.Parent  = nil
+
+    local BloomEffect = Instance.new("BloomEffect")
+    BloomEffect.Enabled = false
+    BloomEffect.Intensity = 0.5
+    BloomEffect.Size = 24
+    BloomEffect.Threshold = 0.9
+    BloomEffect.Parent = nil
+
+    local SkyboxesTable = {
+        ["Galaxy"] = { SkyboxBk="http://www.roblox.com/asset/?id=159454299", SkyboxDn="http://www.roblox.com/asset/?id=159454296", SkyboxFt="http://www.roblox.com/asset/?id=159454293", SkyboxLf="http://www.roblox.com/asset/?id=159454286", SkyboxRt="http://www.roblox.com/asset/?id=159454300", SkyboxUp="http://www.roblox.com/asset/?id=159454288" },
+        ["Pink Sky"] = { SkyboxLf="rbxassetid://271042310", SkyboxBk="rbxassetid://271042516", SkyboxDn="rbxassetid://271077243", SkyboxFt="rbxassetid://271042556", SkyboxRt="rbxassetid://271042467", SkyboxUp="rbxassetid://271077958" },
+        ["Sunset"] = { SkyboxBk="http://www.roblox.com/asset/?id=458016711", SkyboxDn="http://www.roblox.com/asset/?id=458016826", SkyboxFt="http://www.roblox.com/asset/?id=458016532", SkyboxLf="http://www.roblox.com/asset/?id=458016655", SkyboxRt="http://www.roblox.com/asset/?id=458016782", SkyboxUp="http://www.roblox.com/asset/?id=458016792" },
+        ["Night"] = { SkyboxBk="rbxassetid://48020371", SkyboxDn="rbxassetid://48020144", SkyboxFt="rbxassetid://48020234", SkyboxLf="rbxassetid://48020211", SkyboxRt="rbxassetid://48020254", SkyboxUp="rbxassetid://48020383" },
+        ["Evening"] = { SkyboxLf="http://www.roblox.com/asset/?id=7950573918", SkyboxBk="http://www.roblox.com/asset/?id=7950569153", SkyboxDn="http://www.roblox.com/asset/?id=7950570785", SkyboxFt="http://www.roblox.com/asset/?id=7950572449", SkyboxRt="http://www.roblox.com/asset/?id=7950575055", SkyboxUp="http://www.roblox.com/asset/?id=7950627627" },
+        ["Night Sky"] = { SkyboxBk="rbxassetid://12064107", SkyboxDn="rbxassetid://12064152", SkyboxFt="rbxassetid://12064121", SkyboxLf="rbxassetid://12063984", SkyboxRt="rbxassetid://12064115", SkyboxUp="rbxassetid://12064131" },
+        ["Pink Daylight"] = { SkyboxBk="rbxassetid://271042516", SkyboxDn="rbxassetid://271077243", SkyboxFt="rbxassetid://271042556", SkyboxLf="rbxassetid://271042310", SkyboxRt="rbxassetid://271042467", SkyboxUp="rbxassetid://271077958" },
+        ["Morning Glow"] = { SkyboxBk="rbxassetid://1417494030", SkyboxDn="rbxassetid://1417494146", SkyboxFt="rbxassetid://1417494253", SkyboxLf="rbxassetid://1417494402", SkyboxRt="rbxassetid://1417494499", SkyboxUp="rbxassetid://1417494643" },
+        ["Setting Sun"] = { SkyboxBk="rbxassetid://626460377", SkyboxDn="rbxassetid://626460216", SkyboxFt="rbxassetid://626460513", SkyboxLf="rbxassetid://626473032", SkyboxRt="rbxassetid://626458639", SkyboxUp="rbxassetid://626460625" },
+        ["Fade Blue"] = { SkyboxBk="rbxassetid://153695414", SkyboxDn="rbxassetid://153695352", SkyboxFt="rbxassetid://153695452", SkyboxLf="rbxassetid://153695320", SkyboxRt="rbxassetid://153695383", SkyboxUp="rbxassetid://153695471" },
+        ["Elegant Morning"] = { SkyboxBk="rbxassetid://153767241", SkyboxDn="rbxassetid://153767216", SkyboxFt="rbxassetid://153767266", SkyboxLf="rbxassetid://153767200", SkyboxRt="rbxassetid://153767231", SkyboxUp="rbxassetid://153767288" },
+        ["Neptune"] = { SkyboxBk="rbxassetid://218955819", SkyboxDn="rbxassetid://218953419", SkyboxFt="rbxassetid://218954524", SkyboxLf="rbxassetid://218958493", SkyboxRt="rbxassetid://218957134", SkyboxUp="rbxassetid://218950090" },
+        ["Redshift"] = { SkyboxBk="rbxassetid://401664839", SkyboxDn="rbxassetid://401664862", SkyboxFt="rbxassetid://401664960", SkyboxLf="rbxassetid://401664881", SkyboxRt="rbxassetid://401664901", SkyboxUp="rbxassetid://401664936" },
+        ["Aesthetic Night"] = { SkyboxBk="rbxassetid://1045964490", SkyboxDn="rbxassetid://1045964368", SkyboxFt="rbxassetid://1045964655", SkyboxLf="rbxassetid://1045964655", SkyboxRt="rbxassetid://1045964655", SkyboxUp="rbxassetid://1045962969" },
+    }
+
+    local footTrail = {
+        Enabled = false,
+        Color = Color3.fromRGB(255, 0, 0),
+        Width = 0.016,
+        Length = 50,
+        Lifetime = 5,
+        parts = {},
+        lastPos = nil,
+    }
+
+    local WorldAmbient = WorldLeft:AddToggle("World/Ambient", { Text = "Ambience", Default = false })
+    WorldAmbient:AddColorPicker("World/AmbientIn",  { Default = Color3.fromRGB(75, 58, 222),  Title = "Ambient" })
+    WorldAmbient:AddColorPicker("World/AmbientOut", { Default = Color3.fromRGB(109, 58, 206), Title = "Outdoor Ambient" })
+
+    WorldLeft:AddToggle("World/ForceTime", { Text = "Force Time", Default = false })
+    WorldLeft:AddSlider("World/TimeValue", { Text = "Time", Default = 12, Min = 0, Max = 24, Rounding = 0 })
+
+    WorldLeft:AddToggle("World/Saturation", { Text = "Saturation", Default = false })
+    WorldLeft:AddSlider("World/SaturationValue", { Text = "Value", Default = 0, Min = 0, Max = 1, Rounding = 2 })
+
+    local WorldFog = WorldLeft:AddToggle("World/Fog", { Text = "Atmosphere Fog", Default = false })
+    WorldFog:AddColorPicker("World/FogColor", { Default = Color3.fromRGB(199,199,199), Title = "Fog Color" })
+    WorldFog:AddColorPicker("World/FogDecay", { Default = Color3.fromRGB(199,199,199), Title = "Fog Decay" })
+    WorldLeft:AddSlider("World/FogDensity", { Text = "Fog Density", Default = 0, Min = 0, Max = 1, Rounding = 2 })
+    WorldLeft:AddSlider("World/FogOffset",  { Text = "Fog Offset",  Default = 0, Min = 0, Max = 1, Rounding = 2 })
+    WorldLeft:AddSlider("World/FogHaze",    { Text = "Fog Haze",    Default = 0, Min = 0, Max = 1, Rounding = 2 })
+    WorldLeft:AddSlider("World/FogGlare",   { Text = "Fog Glare",   Default = 0, Min = 0, Max = 1, Rounding = 2 })
+
+    WorldRight:AddToggle("World/SkyboxEnabled", { Text = "Skybox", Default = false })
+    WorldRight:AddDropdown("World/SkyboxType", {
+        Values = {"Galaxy","Pink Sky","Sunset","Night","Evening","Night Sky","Pink Daylight","Morning Glow","Setting Sun","Fade Blue","Elegant Morning","Neptune","Redshift","Aesthetic Night"},
+        Default = "Galaxy", Text = "Skybox"
+    })
+
+    WorldRight:AddToggle("World/Bloom", { Text = "Bloom Effect", Default = false })
+    WorldRight:AddSlider("World/BloomIntensity", { Text = "Bloom Intensity", Default = 0.5, Min = 0, Max = 2,   Rounding = 2 })
+    WorldRight:AddSlider("World/BloomSize",      { Text = "Bloom Size",      Default = 24,  Min = 1, Max = 56,  Rounding = 0 })
+    WorldRight:AddSlider("World/BloomThreshold", { Text = "Bloom Threshold", Default = 0.9, Min = 0, Max = 1,   Rounding = 2 })
+
+    local WorldTrailTog = WorldTrail:AddToggle("World/FootTrailEnabled", { Text = "Trail", Default = false })
+    WorldTrailTog:AddColorPicker("World/FootTrailColor", { Default = Color3.fromRGB(255,255,255), Title = "Trail Color" })
+    WorldTrail:AddSlider("World/FootTrailLength",   { Text = "Trail Length",   Default = 50, Min = 10, Max = 100, Rounding = 0 })
+    WorldTrail:AddSlider("World/FootTrailLifetime", { Text = "Trail Lifetime", Default = 5,  Min = 1,  Max = 10,  Rounding = 0 })
+
+    Toggles["World/FootTrailEnabled"]:OnChanged(function() footTrail.Enabled = Toggles["World/FootTrailEnabled"].Value end)
+    Options["World/FootTrailColor"]:OnChanged(function() footTrail.Color = Options["World/FootTrailColor"].Value end)
+    Options["World/FootTrailLength"]:OnChanged(function() footTrail.Length = Options["World/FootTrailLength"].Value end)
+    Options["World/FootTrailLifetime"]:OnChanged(function() footTrail.Lifetime = Options["World/FootTrailLifetime"].Value end)
+
+    local MagicBulletToggle = MagicBulletGroup:AddToggle("World/MagicBulletEnabled", { Text = "Enabled", Default = false })
+    MagicBulletToggle:AddColorPicker("World/MagicBulletColor", { Default = Color3.fromRGB(255,255,255), Title = "Trail Color" })
+    MagicBulletGroup:AddSlider("World/MagicBulletLifetime", { Text = "Lifetime", Default = 20, Min = 1, Max = 50, Rounding = 0 })
+
+    local function GetBulletTrails()
+        local ok, result = pcall(function()
+            return {
+                game:GetService("ReplicatedStorage").GameData.Effects.Debris.GunAssets.Bullets.Normal.Trail,
+                game:GetService("ReplicatedStorage").GameData.Effects.Debris.GunAssets.Bullets.Medium.Trail,
+                game:GetService("ReplicatedStorage").GameData.Effects.Debris.GunAssets.Bullets.MediumBig.Trail,
+                game:GetService("ReplicatedStorage").GameData.Effects.Debris.GunAssets.Bullets.Big.Trail,
+            }
+        end)
+        return ok and result or {}
+    end
+
+    local originalTrailValues = {}
+
+    local function SetupMagicBullets()
+        local trails = GetBulletTrails()
+        if #trails == 0 then return end
+
+        if next(originalTrailValues) == nil then
+            for i, trail in ipairs(trails) do
+                originalTrailValues[i] = {
+                    Color = trail.Color,
+                    LightEmission = trail.LightEmission,
+                    Transparency = trail.Transparency,
+                    Lifetime = trail.Lifetime,
+                    WidthScale = trail.WidthScale,
+                    MaxLength = trail.MaxLength,
+                }
+            end
+        end
+
+        if Toggles["World/MagicBulletEnabled"].Value then
+            local colorSeq = ColorSequence.new(Options["World/MagicBulletColor"].Value)
+            for _, trail in ipairs(trails) do
+                trail.Color = colorSeq
+                trail.LightEmission = 1.5
+                trail.Transparency = NumberSequence.new{
+                    NumberSequenceKeypoint.new(0, 0),
+                    NumberSequenceKeypoint.new(1, 1),
+                }
+                trail.Lifetime = Options["World/MagicBulletLifetime"].Value
+                trail.WidthScale = NumberSequence.new{
+                    NumberSequenceKeypoint.new(0, 0.3),
+                    NumberSequenceKeypoint.new(1, 0.3),
+                }
+                trail.MaxLength = 10000
+            end
+        else
+            for i, trail in ipairs(trails) do
+                local orig = originalTrailValues[i]
+                if orig then
+                    trail.Color = orig.Color
+                    trail.LightEmission = orig.LightEmission
+                    trail.Transparency = orig.Transparency
+                    trail.Lifetime = orig.Lifetime
+                    trail.WidthScale = orig.WidthScale
+                    trail.MaxLength = orig.MaxLength or 1000
+                end
+            end
+        end
+    end
+
+    Toggles["World/MagicBulletEnabled"]:OnChanged(SetupMagicBullets)
+    Options["World/MagicBulletColor"]:OnChanged(function()
+        if Toggles["World/MagicBulletEnabled"].Value then SetupMagicBullets() end
+    end)
+    Options["World/MagicBulletLifetime"]:OnChanged(function()
+        if Toggles["World/MagicBulletEnabled"].Value then SetupMagicBullets() end
+    end)
+
+    local function UpdateSkybox()
+        if Toggles["World/SkyboxEnabled"].Value then
+            local sky = Lighting:FindFirstChild("IsleSky") or Instance.new("Sky")
+            sky.Parent = Lighting
+            sky.Name = "IsleSky"
+            local data = SkyboxesTable[Options["World/SkyboxType"].Value]
+            if data then
+                sky.SkyboxBk = data.SkyboxBk
+                sky.SkyboxDn = data.SkyboxDn
+                sky.SkyboxFt = data.SkyboxFt
+                sky.SkyboxLf = data.SkyboxLf
+                sky.SkyboxRt = data.SkyboxRt
+                sky.SkyboxUp = data.SkyboxUp
+            end
+        else
+            local sky = Lighting:FindFirstChild("IsleSky")
+            if sky then sky:Destroy() end
+            if OriginalSky then
+                OriginalSky.Parent = Lighting
+            end
+        end
+    end
+    Options["World/SkyboxType"]:OnChanged(UpdateSkybox)
+    Toggles["World/SkyboxEnabled"]:OnChanged(UpdateSkybox)
+
+    local function Visuals()
+        if Toggles["World/Ambient"].Value then
+            Lighting.Ambient = Options["World/AmbientIn"].Value
+            Lighting.OutdoorAmbient = Options["World/AmbientOut"].Value
+        else
+            Lighting.Ambient = OriginalAmbient
+            Lighting.OutdoorAmbient = OriginalOutdoorAmbient
+        end
+
+        if Toggles["World/ForceTime"].Value then
+            Lighting.TimeOfDay = Options["World/TimeValue"].Value
+        else
+            Lighting.TimeOfDay = OriginalTimeOfDay
+        end
+
+        if Toggles["World/Saturation"].Value then
+            if SaturationEffect.Parent ~= CurrentCamera then
+                SaturationEffect.Parent = CurrentCamera
+            end
+            SaturationEffect.Enabled = true
+            SaturationEffect.Saturation = Options["World/SaturationValue"].Value
+        else
+            SaturationEffect.Enabled = false
+            if SaturationEffect.Parent == CurrentCamera then SaturationEffect.Parent = nil end
+        end
+
+        if Toggles["World/Bloom"].Value then
+            if BloomEffect.Parent ~= CurrentCamera then
+                BloomEffect.Parent = CurrentCamera
+            end
+            BloomEffect.Enabled = true
+            BloomEffect.Intensity = Options["World/BloomIntensity"].Value
+            BloomEffect.Size = Options["World/BloomSize"].Value
+            BloomEffect.Threshold = Options["World/BloomThreshold"].Value
+        else
+            BloomEffect.Enabled = false
+            if BloomEffect.Parent == CurrentCamera then BloomEffect.Parent = nil end
+        end
+
+        if Toggles["World/Fog"].Value then
+            if Atmosphere.Parent ~= Lighting then Atmosphere.Parent = Lighting end
+            Atmosphere.Density = Options["World/FogDensity"].Value
+            Atmosphere.Offset  = Options["World/FogOffset"].Value
+            Atmosphere.Haze    = Options["World/FogHaze"].Value
+            Atmosphere.Glare   = Options["World/FogGlare"].Value
+            Atmosphere.Color   = Options["World/FogColor"].Value
+            Atmosphere.Decay   = Options["World/FogDecay"].Value
+        else
+            if Atmosphere.Parent == Lighting then Atmosphere.Parent = nil end
+        end
+    end
+
+    local function createTrailSegment(startPos, endPos)
+        local part = Instance.new("Part")
+        part.Anchored = true
+        part.CanCollide = false
+        part.Color = footTrail.Color
+        part.Material = Enum.Material.Neon
+        part.Size = Vector3.new(footTrail.Width, footTrail.Width, (startPos - endPos).Magnitude)
+        part.CFrame = CFrame.new(startPos, endPos) * CFrame.new(0, 0, -part.Size.Z/2)
+        part.Parent = workspace
+        table.insert(footTrail.parts, { Part = part, Time = os.clock() })
+    end
+
+    RunService.Heartbeat:Connect(function()
+        if not footTrail.Enabled or not LocalPlayer.Character then
+            footTrail.lastPos = nil
+            return
+        end
+        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        local currentPos = root.Position - Vector3.new(0, 2.5, 0)
+        if footTrail.lastPos and (currentPos - footTrail.lastPos).Magnitude > 0.1 then
+            createTrailSegment(footTrail.lastPos, currentPos)
+        end
+        footTrail.lastPos = currentPos
+
+        local currentTime = os.clock()
+        for i = #footTrail.parts, 1, -1 do
+            if currentTime - footTrail.parts[i].Time > footTrail.Lifetime then
+                footTrail.parts[i].Part:Destroy()
+                table.remove(footTrail.parts, i)
+            end
+        end
+        while #footTrail.parts > footTrail.Length do
+            footTrail.parts[1].Part:Destroy()
+            table.remove(footTrail.parts, 1)
+        end
+    end)
+
+    local function ApplyDefaultUIProperties(object, variant)
+        if object:IsA("Frame") and variant == "Circle" then
+            object.BorderSizePixel = 0
+            object.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            object.Size = UDim2.new(0, 0, 0, 0)
+            object.ClipsDescendants = false
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(1, 0)
+            corner.Parent = object
+        elseif object:IsA("Frame") then
+            object.BorderSizePixel = 0
+            object.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            object.BackgroundTransparency = 1
+            object.Size = UDim2.new(0, 0, 0, 0)
+            object.ClipsDescendants = false
+        elseif object:IsA("TextLabel") then
+            object.BackgroundTransparency = 1
+            object.TextSize = 12
+            object.FontFace = SmallestPixel7
+            object.TextColor3 = Color3.fromRGB(255, 255, 255)
+            object.ClipsDescendants = false
+        elseif object:IsA("ScreenGui") then
+            object.IgnoreGuiInset = true
+            object.ResetOnSpawn = false
+        end
+    end
+
+    local RenderObjectUtils = {
+        SetRenderProperty = function(object, property, value)
+            if object and object[property] ~= nil then
+                if property == "Font" then property = "FontFace" end
+                object[property] = value
+            end
+            return object
+        end,
+        GetRenderProperty = function(object, property)
+            if object then return object[property] end
+            return nil
+        end,
+        DestroyRenderObject = function(object)
+            if object then object:Destroy() end
+        end,
+        new = function(className, properties)
+            local variant
+            if className == "Circle" then className = "Frame"; variant = "Circle" end
+            local instance = Instance.new(className)
+            properties = properties or {}
+            ApplyDefaultUIProperties(instance, variant)
+            for propName, propValue in pairs(properties) do
+                pcall(function() instance[propName] = propValue end)
+            end
+            return instance
+        end,
+    }
+
+    local TextCache = {}
+    local GlobalConfig = { TextCache = TextCache }
+
+    local GlobalState = {
+        Esp = {
+            Entities = {},
+            SettingsCache = { TextCases = {}, TweenInformation = { TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) } },
+            TextOffsets = {
+                SmallestPixel7 = {
+                    X = 0, Y = 0,
+                    Side = { Bottom = { X = 0, Y = -2 }, Left = { X = -1, Y = 0 }, Right = { X = 0, Y = 0 } },
+                },
+            },
+            Holder = RenderObjectUtils.new("ScreenGui", { Parent = UIHolder }),
+        },
+        Utility = {},
+        Assets = { Images = {} },
+    }
+
+    GlobalState.Utility.GetTransparency = function(object)
+        if object and object.IsA then
+            if object.ClassName == "UIStroke" then return "Transparency"
+            elseif object.ClassName == "Frame" then return "BackgroundTransparency"
+            elseif object.ClassName == "TextLabel" then return "TextTransparency"
+            elseif object.ClassName == "ImageLabel" then return "ImageTransparency"
+            end
+        end
+        return nil
+    end
+
+    GlobalState.Utility.GetTextBounds = function(text, font, size, maxWidth)
+        local cacheKey = text .. "|" .. tostring(font) .. "|" .. tostring(size) .. "|" .. tostring(maxWidth)
+        local cached = TextCache[cacheKey]
+        if cached then return cached.X, cached.Y end
+        local params = Instance.new("GetTextBoundsParams")
+        params.Text = text
+        params.RichText = true
+        params.Font = font
+        params.Size = size
+        params.Width = maxWidth or CurrentCamera.ViewportSize.X - 32
+        local bounds = TextService:GetTextBoundsAsync(params)
+        TextCache[cacheKey] = { X = bounds.X, Y = bounds.Y }
+        return bounds.X, bounds.Y
+    end
+
+    local HUGE_VALUE = 1e309
+
+    local function FixTextPadding(textLabel)
+        local fontName = "SmallestPixel7"
+        local offsets = GlobalState.Esp.TextOffsets[fontName]
+        local sideName = textLabel.Parent and textLabel.Parent.Name or ""
+        local textWidth, textHeight = GlobalState.Utility.GetTextBounds(textLabel.Text, textLabel.FontFace, textLabel.TextSize)
+        if offsets.Side and offsets.Side[sideName] then
+            local sideOffsets = offsets.Side[sideName]
+            textLabel.Size = UDim2.fromOffset(textWidth + sideOffsets.X, textHeight + sideOffsets.Y)
+        else
+            textLabel.Size = UDim2.fromOffset(textWidth + offsets.X, textHeight + offsets.Y)
+        end
+    end
+
+    local function GetBoundingBoxes(rootCFrame, screenPos, scale, character)
+        local minX, maxX = HUGE_VALUE, -HUGE_VALUE
+        local minY, maxY = HUGE_VALUE, -HUGE_VALUE
+
+        if character then
+            local minX2, minY2, maxX2, maxY2 = HUGE_VALUE, HUGE_VALUE, -HUGE_VALUE, -HUGE_VALUE
+            local modelCFrame, modelSize = character:GetBoundingBox()
+            local halfSizeX = modelSize.X * 0.5
+            local halfSizeY = modelSize.Y * 0.5
+            local halfSizeZ = modelSize.Z * 0.5
+            local offsetsX = { halfSizeX, -halfSizeX, halfSizeX, -halfSizeX, halfSizeX, -halfSizeX, halfSizeX, -halfSizeX }
+            local offsetsY = { halfSizeY, halfSizeY, -halfSizeY, -halfSizeY, halfSizeY, halfSizeY, -halfSizeY, -halfSizeY }
+            local offsetsZ = { halfSizeZ, halfSizeZ, halfSizeZ, halfSizeZ, -halfSizeZ, -halfSizeZ, -halfSizeZ, -halfSizeZ }
+            for i = 1, 8 do
+                local ox, oy, oz = offsetsX[i], offsetsY[i], offsetsZ[i]
+                local worldPos = modelCFrame:PointToWorldSpace(Vector3.new(ox, oy, oz))
+                local projX, projY = CurrentCamera:WorldToViewportPoint(worldPos).X, CurrentCamera:WorldToViewportPoint(worldPos).Y
+                if projX < minX2 then minX2 = projX end
+                if projX > maxX2 then maxX2 = projX end
+                if projY < minY2 then minY2 = projY end
+                if projY > maxY2 then maxY2 = projY end
+            end
+            if minX2 ~= HUGE_VALUE then
+                return math.floor(minX2), math.floor(minY2), math.floor(maxX2), math.floor(maxY2)
+            end
+        end
+
+        local headHeight = 2.68 * scale
+        local headScreenPos = CurrentCamera:WorldToViewportPoint(rootCFrame.Position + Vector3.new(0, headHeight, 0))
+        local heightDiff = headScreenPos.Y - screenPos.Y
+        local boxWidth = heightDiff / 1.5
+        local centerX = screenPos.X
+        local centerY = screenPos.Y
+        local leftX = centerX + boxWidth
+        local rightX = centerX - boxWidth
+        local bottomY = centerY + (boxWidth * 1.15)
+        local topY = centerY - (heightDiff * 1.15)
+        local corners = {
+            Vector2.new(leftX, bottomY), Vector2.new(rightX, topY),
+            Vector2.new(leftX, topY), Vector2.new(rightX, bottomY),
+        }
+        for _, corner in ipairs(corners) do
+            if minX > corner.X then minX = corner.X end
+            if maxX < corner.X then maxX = corner.X end
+            if minY > corner.Y then minY = corner.Y end
+            if maxY < corner.Y then maxY = corner.Y end
+        end
+        return math.floor(minX), math.floor(minY), math.floor(maxX), math.floor(maxY)
+    end
+
+    local function CanChangeTransparency(entity, object)
+        if object == nil or entity == nil then return false end
+        for _, noFadeObj in pairs(entity.NoFade) do
+            if noFadeObj == object then return false end
+        end
+        return true
+    end
+
+    local function EspHide(entity)
+        if entity.IsFading then return end
+        local frameHolder = entity.Objects.FrameHolder
+        if frameHolder and frameHolder.Visible == true then
+            frameHolder.Visible = false
+        end
+    end
+
+    local function EspShow(entity)
+        if entity.IsFading then return end
+        local frameHolder = entity.Objects.FrameHolder
+        if frameHolder and frameHolder.Visible == false then
+            frameHolder.Visible = true
+        end
+    end
+
+    local function ApplyTextLabel(textLabel)
+        local textCase = Options["Esp/TextCases"].Value
+        local textWrapper = Options["Esp/TextWrapper"].Value
+        if not GlobalState.Esp.SettingsCache.TextCases[textLabel] then
+            local originalText = textLabel.Text
+            GlobalState.Esp.SettingsCache.TextCases[textLabel] = {
+                Upper = string.upper(originalText),
+                Normal = originalText,
+                Lower = string.lower(originalText),
+            }
+        end
+        local cachedTexts = GlobalState.Esp.SettingsCache.TextCases[textLabel]
+        local newText
+        if textCase == "UPPER" then newText = cachedTexts.Upper
+        elseif textCase == "lower" then newText = cachedTexts.Lower
+        else newText = cachedTexts.Normal end
+        if textWrapper == "[Brackets]" then textLabel.Text = "[" .. newText .. "]"
+        elseif textWrapper == "{Braces}" then textLabel.Text = "{" .. newText .. "}"
+        else textLabel.Text = newText end
+        FixTextPadding(textLabel)
+    end
+
+    local function EspFade(fadeIn, entity)
+        local targetAlpha = fadeIn and 0 or 1
+        for _, object in pairs(entity.Objects) do
+            if CanChangeTransparency(entity, object) == true then
+                local transparencyProp = GlobalState.Utility.GetTransparency(object)
+                if transparencyProp then
+                    local tween = TweenService:Create(object, GlobalState.Esp.SettingsCache.TweenInformation[1], { [transparencyProp] = targetAlpha })
+                    tween:Play()
+                end
+            end
+        end
+    end
+
+    local function EspSetTransparency(entity, alpha)
+        if entity.LastAlpha == alpha then return end
+        entity.LastAlpha = alpha
+        for _, object in pairs(entity.Objects) do
+            if CanChangeTransparency(entity, object) then
+                local transparencyProp = GlobalState.Utility.GetTransparency(object)
+                if transparencyProp then object[transparencyProp] = alpha end
+            end
+        end
+    end
+
+    local function GetHealth(character)
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return 0, 100 end
+        return humanoid.Health, humanoid.MaxHealth
+    end
+
+    local function UpdateElement(player)
+        local entity = GlobalState.Esp.Entities[player]
+        if not entity then return end
+        local objects = entity.Objects
+
+        GlobalState.Esp.SettingsCache.TweenInformation[1] = TweenInfo.new(
+            Options["Esp/FadeTime"].Value,
+            Enum.EasingStyle[Options["Esp/FadeEasingStyle"].Value],
+            Enum.EasingDirection.Out
+        )
+
+        objects.HealthBarNumber.Visible = Toggles["Esp/HealthBarNumber"].Value and Toggles["Esp/HealthBar"].Value
+        objects.HealthBarNumber.TextColor3 = Options["Esp/HealthBarNumberColor"].Value
+
+        local color1 = Options["Esp/BoxColor1"].Value
+        local color2 = Options["Esp/BoxColor2"].Value
+        objects.BoxGradient.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, color1),
+            ColorSequenceKeypoint.new(1, color2),
+        }
+        objects.Box.Visible = Toggles["Esp/Box"].Value
+        objects.FullBoxHolder.Visible = Toggles["Esp/Box"].Value
+
+        local fillColor1 = Options["Esp/BoxFillColor1"].Value
+        local fillColor2 = Options["Esp/BoxFillColor2"].Value
+        local fillAlpha1 = Options["Esp/BoxFillColor1"].Transparency or 0.5
+        local fillAlpha2 = Options["Esp/BoxFillColor2"].Transparency or 0.5
+        objects.BoxFillGradient.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, fillColor1),
+            ColorSequenceKeypoint.new(1, fillColor2),
+        }
+        objects.BoxFillGradient.Transparency = NumberSequence.new {
+            NumberSequenceKeypoint.new(0, fillAlpha1),
+            NumberSequenceKeypoint.new(1, fillAlpha2),
+        }
+        objects.BoxFill.BackgroundTransparency = 0
+        objects.BoxFill.Visible = Toggles["Esp/BoxFill"].Value and Toggles["Esp/Box"].Value
+
+        objects.Name.Visible = Toggles["Esp/Name"].Value
+        objects.Name.TextColor3 = Options["Esp/NameColor"].Value
+        ApplyTextLabel(objects.Name)
+
+        objects.Distance.Visible = Toggles["Esp/Distance"].Value
+        objects.Distance.TextColor3 = Options["Esp/DistanceColor"].Value
+        ApplyTextLabel(objects.Distance)
+
+        local healthBarThickness = Options["Esp/HealthBarThickness"].Value or 1
+        objects.HealthBarHolder.Visible = Toggles["Esp/HealthBar"].Value
+        objects.HealthBarHolder.Size = UDim2.new(0, healthBarThickness, 1, 2)
+        local hbColor1 = Options["Esp/HealthBarColor1"].Value
+        local hbColor2 = Options["Esp/HealthBarColor2"].Value
+        entity.LastHealthBarSide = nil
+        objects.HealthBarFillGradient.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, hbColor1),
+            ColorSequenceKeypoint.new(0.5, hbColor1:Lerp(hbColor2, 0.5)),
+            ColorSequenceKeypoint.new(1, hbColor2),
+        }
+    end
+
+    local function AddEntity(player)
+        local objects = {}
+        local noFadeObjects = {}
+        local entityData = { Objects = objects, NoFade = noFadeObjects, IsOnScreen = false, IsFading = false, HasFadedIn = false }
+        GlobalState.Esp.Entities[player] = entityData
+
+        objects.FrameHolder = RenderObjectUtils.new("Frame", { Visible = false, Parent = GlobalState.Esp.Holder, BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0) })
+        objects.Box = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1 })
+        noFadeObjects.Holder = objects.FrameHolder
+        noFadeObjects.BoxHolder = objects.Box
+
+        objects.FullBoxHolder = RenderObjectUtils.new("Frame", { Visible = false, Parent = objects.Box, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1 })
+        noFadeObjects.FullBoxHolder = objects.FullBoxHolder
+        objects.BoxStroke = RenderObjectUtils.new("UIStroke", { Parent = objects.FullBoxHolder, LineJoinMode = "Miter", Thickness = 1, ZIndex = 5, Color = Color3.fromRGB(255, 255, 255) })
+        objects.BoxOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.FullBoxHolder, Thickness = 3, Color = Color3.fromRGB(0, 0, 0), BorderOffset = UDim.new(0, -1), LineJoinMode = "Miter" })
+        objects.BoxGradient = RenderObjectUtils.new("UIGradient", { Parent = objects.BoxStroke, Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255)) })
+
+        objects.SideLeft = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(-1, 0, 0, -4), BackgroundTransparency = 1, Name = "Left" })
+        objects.SideRight = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(1, 0, 0, -4), BackgroundTransparency = 1, Name = "Right" })
+        objects.SideBottom = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0, 0, 1, 0), BackgroundTransparency = 1, Name = "Bottom" })
+        objects.SideTop = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0, 0, -1, 0), BackgroundTransparency = 1, Name = "Top" })
+        noFadeObjects.Left = objects.SideLeft
+        noFadeObjects.Right = objects.SideRight
+        noFadeObjects.Bottom = objects.SideBottom
+        noFadeObjects.Top = objects.SideTop
+        RenderObjectUtils.new("UIListLayout", { Parent = objects.SideLeft, HorizontalAlignment = "Right", Padding = UDim.new(0, 1) })
+        RenderObjectUtils.new("UIListLayout", { Parent = objects.SideRight, HorizontalAlignment = "Left", Padding = UDim.new(0, 1) })
+        RenderObjectUtils.new("UIListLayout", { Parent = objects.SideBottom, HorizontalAlignment = "Center", VerticalAlignment = "Top", Padding = UDim.new(0, 1) })
+        RenderObjectUtils.new("UIListLayout", { Parent = objects.SideTop, HorizontalAlignment = "Center", Padding = UDim.new(0, 1), VerticalAlignment = "Bottom" })
+
+        RenderObjectUtils.new("UIPadding", { PaddingTop = UDim.new(0, 0), PaddingBottom = UDim.new(0, 0), Parent = objects.SideLeft, PaddingRight = UDim.new(0, 4), PaddingLeft = UDim.new(0, 0) })
+        RenderObjectUtils.new("UIPadding", { PaddingTop = UDim.new(0, 0), PaddingBottom = UDim.new(0, 0), Parent = objects.SideRight, PaddingRight = UDim.new(0, 0), PaddingLeft = UDim.new(0, 4) })
+        RenderObjectUtils.new("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 0), Parent = objects.SideBottom, PaddingRight = UDim.new(0, 0), PaddingLeft = UDim.new(0, 0) })
+        RenderObjectUtils.new("UIPadding", { PaddingTop = UDim.new(0, 0), PaddingBottom = UDim.new(0, 3), Parent = objects.SideTop, PaddingRight = UDim.new(0, 0), PaddingLeft = UDim.new(0, 0) })
+
+        objects.Name = RenderObjectUtils.new("TextLabel", { Text = player.Name, FontFace = SmallestPixel7, TextSize = 9, Parent = objects.SideTop })
+        objects.NameOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.Name, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+        FixTextPadding(objects.Name)
+
+        objects.Distance = RenderObjectUtils.new("TextLabel", { Text = "0m", FontFace = SmallestPixel7, TextSize = 9, Parent = objects.SideBottom })
+        objects.DistanceOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.Distance, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+        FixTextPadding(objects.Distance)
+
+        objects.HealthBarHolder = RenderObjectUtils.new("Frame", {
+            Visible = false, Parent = objects.FrameHolder, BackgroundColor3 = Color3.fromRGB(0, 0, 0), BackgroundTransparency = 0,
+            Size = UDim2.new(0, 1, 1, 2), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(0, -4, 0, -1), BorderSizePixel = 0, ZIndex = 4, ClipsDescendants = true,
+        })
+        objects.HealthBarFill = RenderObjectUtils.new("Frame", {
+            Parent = objects.HealthBarHolder, BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0,
+            Size = UDim2.new(1, 0, 1, 0), AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), BorderSizePixel = 0, ZIndex = 5,
+        })
+        objects.HealthBarOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.HealthBarHolder, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+
+        objects.HealthBarNumber = RenderObjectUtils.new("TextLabel", {
+            Text = "100", FontFace = SmallestPixel7, TextSize = 9, Parent = objects.FrameHolder,
+            TextColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 1, ZIndex = 7,
+            AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0, 0, 0, 0), Size = UDim2.fromOffset(30, 12), ClipsDescendants = false,
+        })
+        objects.HealthBarNumberOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.HealthBarNumber, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+
+        objects.HealthBarFillGradient = RenderObjectUtils.new("UIGradient", { Parent = objects.HealthBarFill, Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(0, 255, 0), Color3.fromRGB(255, 0, 0)) })
+
+        objects.BoxFill = RenderObjectUtils.new("Frame", { Visible = false, Parent = objects.Box, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 0.5, ZIndex = -5 })
+        objects.BoxFillGradient = RenderObjectUtils.new("UIGradient", { Parent = objects.BoxFill, Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(0, 0, 0)) })
+
+        entityData.Render = function()
+            local character = player.Character
+            if not character then
+                if not entityData.IsFading then
+                    EspHide(entityData)
+                    return
+                end
+            end
+
+            if character then
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                local headPart = character:FindFirstChild("Head")
+                if rootPart then
+                    entityData.LastCFrame = rootPart.CFrame
+                    entityData.LastCharacter = character
+                end
+                if headPart then
+                    entityData.LastHeadCFrame = headPart.CFrame
+                end
+            end
+
+            if not entityData.LastCFrame then EspHide(entityData) return end
+            local rootCFrame = entityData.LastCFrame
+            local rootPosition = rootCFrame.Position
+            local screenPoint, onScreen = CurrentCamera:WorldToViewportPoint(rootPosition)
+
+            if entityData.IsFading then
+                if onScreen then
+                    local minX, minY, maxX, maxY = GetBoundingBoxes(rootCFrame, screenPoint, Options["Esp/Scale"].Value, nil)
+                    local width = (maxX + 1) - (minX - 1)
+                    local height = (maxY + 1) - (minY - 1)
+                    objects.FrameHolder.Position = UDim2.fromOffset(minX - 1, minY - 1)
+                    objects.FrameHolder.Size = UDim2.fromOffset(width, height)
+                else
+                    objects.FrameHolder.Visible = false
+                end
+                return
+            end
+
+            if not Toggles["Esp/Enabled"].Value then EspHide(entityData) return end
+
+            local maxDistance = Options["Esp/MaxDistance"].Value or 500
+            local distance = (CurrentCamera.CFrame.Position - rootPosition).Magnitude
+            if distance > maxDistance then EspHide(entityData) return end
+
+            do
+                local health, maxHealth = 0, 100
+                if character then health, maxHealth = GetHealth(character) end
+                entityData.MaxHealth = maxHealth
+                local ratio = math.clamp(health / math.max(maxHealth, 1), 0, 1)
+                entityData.HealthRatio = (entityData.HealthRatio or ratio) + (ratio - (entityData.HealthRatio or ratio)) * (Options["Esp/HealthBarSpeed"].Value or 0.1)
+                local currentRatio = entityData.HealthRatio
+
+                if currentRatio <= 0.01 then
+                    if objects.FrameHolder.Visible then
+                        entityData.IsFading = true
+                        entityData.HasFadedIn = false
+                        EspFade(false, entityData)
+                        task.delay(1.1, function()
+                            entityData.IsFading = false
+                            entityData.LastCFrame = nil
+                            entityData.LastCharacter = nil
+                            entityData.HealthRatio = nil
+                            entityData.LastAlpha = nil
+                            entityData.LastHealthBarSide = nil
+                            EspHide(entityData)
+                            for _, obj in pairs(objects) do
+                                if CanChangeTransparency(entityData, obj) then
+                                    local transparencyProp = GlobalState.Utility.GetTransparency(obj)
+                                    if transparencyProp then obj[transparencyProp] = 0 end
+                                end
+                            end
+                        end)
+                    end
+                    return
+                end
+
+                if ratio == 1 and not entityData.HasFadedIn then
+                    entityData.HasFadedIn = true
+                    entityData.LastAlpha = nil
+                    for _, obj in pairs(objects) do
+                        if CanChangeTransparency(entityData, obj) then
+                            local transparencyProp = GlobalState.Utility.GetTransparency(obj)
+                            if transparencyProp then obj[transparencyProp] = 1 end
+                        end
+                    end
+                    EspShow(entityData)
+                    EspFade(true, entityData)
+                else
+                    EspShow(entityData)
+                end
+            end
+
+            do
+                local distanceLabel = objects.Distance
+                if distanceLabel.Visible then
+                    local distText = math.floor(distance) .. "m"
+                    local textCase = Options["Esp/TextCases"].Value
+                    local textWrapper = Options["Esp/TextWrapper"].Value
+                    if textWrapper == "[Brackets]" then distText = "[" .. distText .. "]"
+                    elseif textWrapper == "{Braces}" then distText = "{" .. distText .. "}" end
+                    if textCase == "UPPER" then distText = string.upper(distText)
+                    elseif textCase == "lower" then distText = string.lower(distText) end
+                    if distanceLabel.Text ~= distText then
+                        distanceLabel.Text = distText
+                        FixTextPadding(distanceLabel)
+                    end
+                end
+
+                if Toggles["Esp/FadeOnDistance"].Value then
+                    local fadeStart = maxDistance * 0.6
+                    local fadeAlpha = math.clamp((distance - fadeStart) / (maxDistance - fadeStart), 0, 1)
+                    EspSetTransparency(entityData, fadeAlpha)
+                else
+                    EspSetTransparency(entityData, 0)
+                end
+            end
+
+            local minX, minY, maxX, maxY = GetBoundingBoxes(rootCFrame, screenPoint, Options["Esp/Scale"].Value, nil)
+
+            if onScreen then
+                local left = minX - 1
+                local top = minY - 1
+                local width = (maxX + 1) - left
+                local height = (maxY + 1) - top
+                entityData.IsOnScreen = true
+                objects.FrameHolder.Position = UDim2.fromOffset(left, top)
+                objects.FrameHolder.Size = UDim2.fromOffset(width, height)
+            else
+                entityData.IsOnScreen = false
+                EspHide(entityData)
+                return
+            end
+
+            do
+                local healthBarEnabled = Toggles["Esp/HealthBar"].Value
+                objects.HealthBarHolder.Visible = healthBarEnabled
+                local thickness = Options["Esp/HealthBarThickness"].Value or 1
+                local offset = 4
+
+                if healthBarEnabled then
+                    local currentRatio = entityData.HealthRatio or 1
+                    local sideChanged = entityData.LastHealthBarSide ~= "Left"
+                    entityData.LastHealthBarSide = "Left"
+
+                    if sideChanged then
+                        objects.HealthBarHolder.AnchorPoint = Vector2.new(1, 0)
+                        objects.HealthBarHolder.Size = UDim2.new(0, thickness, 1, 2)
+                        objects.HealthBarHolder.Position = UDim2.new(0, -offset, 0, -1)
+                        objects.HealthBarFill.AnchorPoint = Vector2.new(0, 1)
+                        objects.HealthBarFill.Position = UDim2.new(0, 0, 1, 0)
+                        objects.HealthBarFillGradient.Rotation = 90
+                    end
+
+                    objects.HealthBarFill.Size = UDim2.new(1, 0, currentRatio, 0)
+
+                    local healthBarNumberLabel = objects.HealthBarNumber
+                    local showNumber = Toggles["Esp/HealthBarNumber"].Value
+                    healthBarNumberLabel.Visible = showNumber and healthBarEnabled
+                    if showNumber then
+                        local maxHp = entityData.MaxHealth or 100
+                        local realHealth = math.clamp(math.round(currentRatio * maxHp), 0, maxHp)
+                        if healthBarNumberLabel.Text ~= tostring(realHealth) then
+                            healthBarNumberLabel.Text = tostring(realHealth)
+                        end
+                        local posXOffset = 5 - ((Options["Esp/HealthBarThickness"].Value or 1) - 1)
+                        healthBarNumberLabel.AnchorPoint = Vector2.new(1, 0.5)
+                        healthBarNumberLabel.Position = UDim2.new(0, -(offset) + posXOffset, 1 - currentRatio, 0)
+                    end
+                end
+            end
+        end
+
+        entityData.CharacterConn = player.CharacterAdded:Connect(function()
+            task.spawn(function()
+                local char = player.Character
+                if not char then return end
+                local root = char:WaitForChild("HumanoidRootPart", 5)
+                if root then
+                    task.wait(0.5)
+                    UpdateElement(player)
+                end
+            end)
+        end)
+        UpdateElement(player)
+    end
+
+    local function RemoveEntity(player)
+        local entity = GlobalState.Esp.Entities[player]
+        if entity then
+            if entity.Objects then
+                for _, obj in pairs(entity.Objects) do
+                    RenderObjectUtils.DestroyRenderObject(obj)
+                end
+            end
+            if entity.CharacterConn then entity.CharacterConn:Disconnect() end
+            GlobalState.Esp.Entities[player] = nil
+        end
+    end
+
+    LeftGroup:AddToggle("Esp/Enabled", { Text = "Enabled", Default = false })
+        :AddKeyPicker("Esp/EnabledBind", { Default = "None", SyncToggleState = true, Mode = "Toggle", Text = "Player ESP", NoUI = false })
+    local boxToggle = LeftGroup:AddToggle("Esp/Box", { Text = "Box", Default = false })
+    boxToggle:AddColorPicker("Esp/BoxColor1", { Default = Color3.fromRGB(255, 255, 255), Title = "Box Color 1" })
+    boxToggle:AddColorPicker("Esp/BoxColor2", { Default = Color3.fromRGB(88, 88, 88), Title = "Box Color 2" })
+    local boxFillToggle = LeftGroup:AddToggle("Esp/BoxFill", { Text = "Box Fill", Default = false })
+    boxFillToggle:AddColorPicker("Esp/BoxFillColor1", { Default = Color3.fromRGB(255, 255, 255), Transparency = 0.5, Title = "Box Fill Color 1" })
+    boxFillToggle:AddColorPicker("Esp/BoxFillColor2", { Default = Color3.fromRGB(0, 0, 0), Transparency = 0.5, Title = "Box Fill Color 2" })
+
+    local nameToggle = LeftGroup:AddToggle("Esp/Name", { Text = "Name", Default = false })
+    nameToggle:AddColorPicker("Esp/NameColor", { Default = Color3.fromRGB(255, 255, 255), Title = "Name Color" })
+
+    local distanceToggle = LeftGroup:AddToggle("Esp/Distance", { Text = "Distance", Default = false })
+    distanceToggle:AddColorPicker("Esp/DistanceColor", { Default = Color3.fromRGB(255, 255, 255), Title = "Distance Color" })
+
+    local healthBarToggle = LeftGroup:AddToggle("Esp/HealthBar", { Text = "Health Bar", Default = false })
+    healthBarToggle:AddColorPicker("Esp/HealthBarColor1", { Default = Color3.fromRGB(255, 255, 255), Transparency = 0, Title = "Health Bar Color 1" })
+    healthBarToggle:AddColorPicker("Esp/HealthBarColor2", { Default = Color3.fromRGB(71, 71, 71), Transparency = 0, Title = "Health Bar Color 2" })
+    local healthBarNumberToggle = LeftGroup:AddToggle("Esp/HealthBarNumber", { Text = "Health Bar Number", Default = false })
+    healthBarNumberToggle:AddColorPicker("Esp/HealthBarNumberColor", { Default = Color3.fromRGB(255, 255, 255), Transparency = 0, Title = "Health Bar Number Color" })
+
+    RightGroup:AddSlider("Esp/MaxDistance", { Text = "Max Distance", Default = 500, Min = 0, Max = 5000, Rounding = 0 })
+    RightGroup:AddToggle("Esp/FadeOnDistance", { Text = "Fade On Distance", Default = false })
+    RightGroup:AddSlider("Esp/Scale", { Text = "Scale", Default = 1, Min = 0.01, Max = 2, Rounding = 2 })
+    RightGroup:AddDropdown("Esp/TextCases", { Values = { "Normal", "UPPER", "lower" }, Default = "Normal", Text = "Text Cases" })
+    RightGroup:AddDropdown("Esp/TextWrapper", { Values = { "None", "[Brackets]", "{Braces}" }, Default = "None", Text = "Text Wrapper" })
+    RightGroup:AddSlider("Esp/HealthBarSpeed", { Text = "Health Bar Speed", Default = 0.1, Min = 0.05, Max = 0.9, Rounding = 2 })
+    RightGroup:AddSlider("Esp/HealthBarThickness", { Text = "Health Bar Thickness", Default = 1, Min = 1, Max = 2, Rounding = 0 })
+    RightGroup:AddSlider("Esp/FadeTime", { Text = "Fade Time", Default = 0.5, Min = 0.1, Max = 2, Rounding = 1, Suffix = "s" })
+    RightGroup:AddDropdown("Esp/FadeEasingStyle", {
+        Values = { "Linear", "Sine", "Back", "Quad", "Quart", "Quint", "Bounce", "Elastic", "Exponential", "Circular", "Cubic" },
+        Default = "Exponential",
+        Text = "Fade Easing Style",
+    })
+
+    local itemESP = {
+        enabled = false,
+        distance = 500,
+        fadeDistance = true,
+        color = Color3.fromRGB(255, 255, 255),
+        transparency = 0,
+        items = {},
+        holder = nil,
+    }
+
+    itemESP.holder = RenderObjectUtils.new("ScreenGui", { Parent = UIHolder, Name = "ItemESP" })
+
+    local ItemESPToggle = ItemESPGroup:AddToggle("Esp/ItemESP", { Text = "Enabled", Default = false })
+    ItemESPToggle:AddKeyPicker("Esp/ItemESPBind", { Default = "None", SyncToggleState = true, Mode = "Toggle", Text = "Item ESP", NoUI = false })
+    ItemESPToggle:AddColorPicker("Esp/ItemESPColor", { Default = Color3.fromRGB(255, 255, 255), Title = "Item Color" })
+    ItemESPGroup:AddSlider("Esp/ItemESPDistance", { Text = "Max Distance", Default = 500, Min = 50, Max = 5000, Rounding = 0 })
+    ItemESPGroup:AddToggle("Esp/ItemESPFade", { Text = "Fade On Distance", Default = true })
+    ItemESPGroup:AddSlider("Esp/ItemESPTransparency", { Text = "Transparency", Default = 0, Min = 0, Max = 1, Rounding = 2 })
+
+    Toggles["Esp/ItemESP"]:OnChanged(function()
+        itemESP.enabled = Toggles["Esp/ItemESP"].Value
+    end)
+    Options["Esp/ItemESPColor"]:OnChanged(function()
+        itemESP.color = Options["Esp/ItemESPColor"].Value
+    end)
+    Options["Esp/ItemESPDistance"]:OnChanged(function()
+        itemESP.distance = Options["Esp/ItemESPDistance"].Value
+    end)
+    Toggles["Esp/ItemESPFade"]:OnChanged(function()
+        itemESP.fadeDistance = Toggles["Esp/ItemESPFade"].Value
+    end)
+    Options["Esp/ItemESPTransparency"]:OnChanged(function()
+        itemESP.transparency = Options["Esp/ItemESPTransparency"].Value
+    end)
+
+    local mercESP = {
+        entities = {},
+        holder = nil,
+    }
+
+    mercESP.holder = RenderObjectUtils.new("ScreenGui", { Parent = UIHolder, Name = "MercESP" })
+
+    MercLeftGroup:AddToggle("Esp/MercEnabled", { Text = "Enabled", Default = false })
+        :AddKeyPicker("Esp/MercEnabledBind", { Default = "None", SyncToggleState = true, Mode = "Toggle", Text = "Merc ESP", NoUI = false })
+
+    local mercBoxToggle = MercLeftGroup:AddToggle("Esp/MercBox", { Text = "Box", Default = false })
+    mercBoxToggle:AddColorPicker("Esp/MercBoxColor1", { Default = Color3.fromRGB(255, 100, 100), Title = "Box Color 1" })
+    mercBoxToggle:AddColorPicker("Esp/MercBoxColor2", { Default = Color3.fromRGB(88, 0, 0), Title = "Box Color 2" })
+
+    local mercBoxFillToggle = MercLeftGroup:AddToggle("Esp/MercBoxFill", { Text = "Box Fill", Default = false })
+    mercBoxFillToggle:AddColorPicker("Esp/MercBoxFillColor1", { Default = Color3.fromRGB(255, 100, 100), Transparency = 0.5, Title = "Box Fill Color 1" })
+    mercBoxFillToggle:AddColorPicker("Esp/MercBoxFillColor2", { Default = Color3.fromRGB(0, 0, 0), Transparency = 0.5, Title = "Box Fill Color 2" })
+
+    local mercNameToggle = MercLeftGroup:AddToggle("Esp/MercName", { Text = "Name", Default = false })
+    mercNameToggle:AddColorPicker("Esp/MercNameColor", { Default = Color3.fromRGB(255, 255, 255), Title = "Name Color" })
+
+    local mercDistanceToggle = MercLeftGroup:AddToggle("Esp/MercDistance", { Text = "Distance", Default = false })
+    mercDistanceToggle:AddColorPicker("Esp/MercDistanceColor", { Default = Color3.fromRGB(255, 255, 255), Title = "Distance Color" })
+
+    local mercHealthBarToggle = MercLeftGroup:AddToggle("Esp/MercHealthBar", { Text = "Health Bar", Default = false })
+    mercHealthBarToggle:AddColorPicker("Esp/MercHealthBarColor1", { Default = Color3.fromRGB(255, 255, 255), Transparency = 0, Title = "Health Bar Color 1" })
+    mercHealthBarToggle:AddColorPicker("Esp/MercHealthBarColor2", { Default = Color3.fromRGB(71, 71, 71), Transparency = 0, Title = "Health Bar Color 2" })
+
+    local mercHealthBarNumberToggle = MercLeftGroup:AddToggle("Esp/MercHealthBarNumber", { Text = "Health Bar Number", Default = false })
+    mercHealthBarNumberToggle:AddColorPicker("Esp/MercHealthBarNumberColor", { Default = Color3.fromRGB(255, 255, 255), Transparency = 0, Title = "Health Bar Number Color" })
+
+    local function GetMercHealth(mercModel)
+        local humanoid = mercModel:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return 0, 100 end
+
+        local hp = humanoid.Health
+        local baseMax = humanoid.MaxHealth
+        if baseMax <= 0 then baseMax = 100 end
+
+        local shieldVal = 0
+        local shield = mercModel:FindFirstChild("#Shield")
+        if shield then
+            if shield:IsA("ValueBase") then
+                shieldVal = tonumber(shield.Value) or 0
+            else
+                local innerVal = shield:FindFirstChild("Value")
+                if innerVal and innerVal:IsA("ValueBase") then
+                    shieldVal = tonumber(innerVal.Value) or 0
+                end
+            end
+        end
+
+        local entity = mercESP.entities[mercModel]
+        if entity then
+            if shieldVal > (entity.MaxShield or 0) then
+                entity.MaxShield = shieldVal
+            end
+            if baseMax > (entity.MaxBaseHealth or 0) then
+                entity.MaxBaseHealth = baseMax
+            end
+        end
+
+        local storedBase = (entity and entity.MaxBaseHealth) or baseMax
+        local storedShield = (entity and entity.MaxShield) or shieldVal
+
+        local totalMax = storedBase + storedShield
+        local totalHp = hp + shieldVal
+
+        return totalHp, totalMax
+    end
+
+    local function MercHide(entity)
+        if entity.IsFading then return end
+        local fh = entity.Objects.FrameHolder
+        if fh and fh.Visible then fh.Visible = false end
+    end
+
+    local function MercShow(entity)
+        if entity.IsFading then return end
+        local fh = entity.Objects.FrameHolder
+        if fh and not fh.Visible then fh.Visible = true end
+    end
+
+    local function MercFade(fadeIn, entity)
+        local targetAlpha = fadeIn and 0 or 1
+        local tweenInfo = TweenInfo.new(
+            Options["Esp/FadeTime"].Value,
+            Enum.EasingStyle[Options["Esp/FadeEasingStyle"].Value],
+            Enum.EasingDirection.Out
+        )
+        for _, object in pairs(entity.Objects) do
+            if CanChangeTransparency(entity, object) then
+                local tp = GlobalState.Utility.GetTransparency(object)
+                if tp then
+                    TweenService:Create(object, tweenInfo, { [tp] = targetAlpha }):Play()
+                end
+            end
+        end
+    end
+
+    local function MercSetTransparency(entity, alpha)
+        if entity.LastAlpha == alpha then return end
+        entity.LastAlpha = alpha
+        for _, object in pairs(entity.Objects) do
+            if CanChangeTransparency(entity, object) then
+                local tp = GlobalState.Utility.GetTransparency(object)
+                if tp then object[tp] = alpha end
+            end
+        end
+    end
+
+    local function CleanMercName(name)
+        local clean = name:gsub("%[%d+%]", "")
+        clean = clean:gsub("#%d+", "")
+        clean = clean:gsub("%s+$", "")
+        clean = clean:gsub("^%s+", "")
+        return clean
+    end
+
+    local function ApplyMercText(textLabel, rawText)
+        local textCase = Options["Esp/TextCases"].Value
+        local textWrapper = Options["Esp/TextWrapper"].Value
+        local newText = rawText
+        if textCase == "UPPER" then newText = string.upper(rawText)
+        elseif textCase == "lower" then newText = string.lower(rawText) end
+        if textWrapper == "[Brackets]" then newText = "[" .. newText .. "]"
+        elseif textWrapper == "{Braces}" then newText = "{" .. newText .. "}" end
+        if textLabel.Text ~= newText then
+            textLabel.Text = newText
+        end
+        FixTextPadding(textLabel)
+    end
+
+    local function AddMercEntity(mercModel)
+        if mercESP.entities[mercModel] then return end
+
+        local objects = {}
+        local noFadeObjects = {}
+        local entityData = {
+            Objects = objects,
+            NoFade = noFadeObjects,
+            Model = mercModel,
+            IsOnScreen = false,
+            IsFading = false,
+            HasFadedIn = false,
+        }
+        mercESP.entities[mercModel] = entityData
+
+        objects.FrameHolder = RenderObjectUtils.new("Frame", { Visible = false, Parent = mercESP.holder, BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0) })
+        objects.Box = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1 })
+        noFadeObjects.Holder = objects.FrameHolder
+        noFadeObjects.BoxHolder = objects.Box
+
+        objects.FullBoxHolder = RenderObjectUtils.new("Frame", { Visible = false, Parent = objects.Box, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1 })
+        noFadeObjects.FullBoxHolder = objects.FullBoxHolder
+        objects.BoxStroke = RenderObjectUtils.new("UIStroke", { Parent = objects.FullBoxHolder, LineJoinMode = "Miter", Thickness = 1, ZIndex = 5, Color = Color3.fromRGB(255, 255, 255) })
+        objects.BoxOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.FullBoxHolder, Thickness = 3, Color = Color3.fromRGB(0, 0, 0), BorderOffset = UDim.new(0, -1), LineJoinMode = "Miter" })
+        objects.BoxGradient = RenderObjectUtils.new("UIGradient", { Parent = objects.BoxStroke, Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255)) })
+
+        objects.SideLeft = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(-1, 0, 0, -4), BackgroundTransparency = 1, Name = "Left" })
+        objects.SideRight = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(1, 0, 0, -4), BackgroundTransparency = 1, Name = "Right" })
+        objects.SideBottom = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0, 0, 1, 0), BackgroundTransparency = 1, Name = "Bottom" })
+        objects.SideTop = RenderObjectUtils.new("Frame", { Visible = true, Parent = objects.FrameHolder, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0, 0, -1, 0), BackgroundTransparency = 1, Name = "Top" })
+        noFadeObjects.Left = objects.SideLeft
+        noFadeObjects.Right = objects.SideRight
+        noFadeObjects.Bottom = objects.SideBottom
+        noFadeObjects.Top = objects.SideTop
+        RenderObjectUtils.new("UIListLayout", { Parent = objects.SideLeft, HorizontalAlignment = "Right", Padding = UDim.new(0, 1) })
+        RenderObjectUtils.new("UIListLayout", { Parent = objects.SideRight, HorizontalAlignment = "Left", Padding = UDim.new(0, 1) })
+        RenderObjectUtils.new("UIListLayout", { Parent = objects.SideBottom, HorizontalAlignment = "Center", VerticalAlignment = "Top", Padding = UDim.new(0, 1) })
+        RenderObjectUtils.new("UIListLayout", { Parent = objects.SideTop, HorizontalAlignment = "Center", Padding = UDim.new(0, 1), VerticalAlignment = "Bottom" })
+
+        RenderObjectUtils.new("UIPadding", { PaddingTop = UDim.new(0, 0), PaddingBottom = UDim.new(0, 0), Parent = objects.SideLeft, PaddingRight = UDim.new(0, 4), PaddingLeft = UDim.new(0, 0) })
+        RenderObjectUtils.new("UIPadding", { PaddingTop = UDim.new(0, 0), PaddingBottom = UDim.new(0, 0), Parent = objects.SideRight, PaddingRight = UDim.new(0, 0), PaddingLeft = UDim.new(0, 4) })
+        RenderObjectUtils.new("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 0), Parent = objects.SideBottom, PaddingRight = UDim.new(0, 0), PaddingLeft = UDim.new(0, 0) })
+        RenderObjectUtils.new("UIPadding", { PaddingTop = UDim.new(0, 0), PaddingBottom = UDim.new(0, 3), Parent = objects.SideTop, PaddingRight = UDim.new(0, 0), PaddingLeft = UDim.new(0, 0) })
+
+        objects.Name = RenderObjectUtils.new("TextLabel", { Text = mercModel.Name, FontFace = SmallestPixel7, TextSize = 9, Parent = objects.SideTop })
+        objects.NameOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.Name, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+        FixTextPadding(objects.Name)
+
+        objects.Distance = RenderObjectUtils.new("TextLabel", { Text = "0m", FontFace = SmallestPixel7, TextSize = 9, Parent = objects.SideBottom })
+        objects.DistanceOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.Distance, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+        FixTextPadding(objects.Distance)
+
+        objects.HealthBarHolder = RenderObjectUtils.new("Frame", {
+            Visible = false, Parent = objects.FrameHolder, BackgroundColor3 = Color3.fromRGB(0, 0, 0), BackgroundTransparency = 0,
+            Size = UDim2.new(0, 1, 1, 2), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(0, -4, 0, -1), BorderSizePixel = 0, ZIndex = 4, ClipsDescendants = true,
+        })
+        objects.HealthBarFill = RenderObjectUtils.new("Frame", {
+            Parent = objects.HealthBarHolder, BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0,
+            Size = UDim2.new(1, 0, 1, 0), AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), BorderSizePixel = 0, ZIndex = 5,
+        })
+        objects.HealthBarOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.HealthBarHolder, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+
+        objects.HealthBarNumber = RenderObjectUtils.new("TextLabel", {
+            Text = "100", FontFace = SmallestPixel7, TextSize = 9, Parent = objects.FrameHolder,
+            TextColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 1, ZIndex = 7,
+            AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0, 0, 0, 0), Size = UDim2.fromOffset(30, 12), ClipsDescendants = false,
+        })
+        objects.HealthBarNumberOutline = RenderObjectUtils.new("UIStroke", { Parent = objects.HealthBarNumber, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+        objects.HealthBarFillGradient = RenderObjectUtils.new("UIGradient", { Parent = objects.HealthBarFill, Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(0, 255, 0), Color3.fromRGB(255, 0, 0)) })
+
+        objects.BoxFill = RenderObjectUtils.new("Frame", { Visible = false, Parent = objects.Box, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 0.5, ZIndex = -5 })
+        objects.BoxFillGradient = RenderObjectUtils.new("UIGradient", { Parent = objects.BoxFill, Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(0, 0, 0)) })
+
+        objects.BoxGradient.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, Options["Esp/MercBoxColor1"].Value),
+            ColorSequenceKeypoint.new(1, Options["Esp/MercBoxColor2"].Value),
+        }
+        objects.BoxFillGradient.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, Options["Esp/MercBoxFillColor1"].Value),
+            ColorSequenceKeypoint.new(1, Options["Esp/MercBoxFillColor2"].Value),
+        }
+        objects.BoxFillGradient.Transparency = NumberSequence.new {
+            NumberSequenceKeypoint.new(0, Options["Esp/MercBoxFillColor1"].Transparency or 0.5),
+            NumberSequenceKeypoint.new(1, Options["Esp/MercBoxFillColor2"].Transparency or 0.5),
+        }
+        objects.Name.TextColor3 = Options["Esp/MercNameColor"].Value
+        objects.Distance.TextColor3 = Options["Esp/MercDistanceColor"].Value
+        objects.HealthBarNumber.TextColor3 = Options["Esp/MercHealthBarNumberColor"].Value
+        objects.HealthBarFillGradient.Color = ColorSequence.new {
+            ColorSequenceKeypoint.new(0, Options["Esp/MercHealthBarColor1"].Value),
+            ColorSequenceKeypoint.new(0.5, Options["Esp/MercHealthBarColor1"].Value:Lerp(Options["Esp/MercHealthBarColor2"].Value, 0.5)),
+            ColorSequenceKeypoint.new(1, Options["Esp/MercHealthBarColor2"].Value),
+        }
+
+        entityData.Render = function()
+            if not mercModel or not mercModel.Parent then
+                MercHide(entityData)
+                return
+            end
+
+            local humanoid = mercModel:FindFirstChildOfClass("Humanoid")
+            local rootPart = mercModel:FindFirstChild("HumanoidRootPart")
+
+            if rootPart then
+                entityData.LastCFrame = rootPart.CFrame
+            end
+
+            if not entityData.LastCFrame then MercHide(entityData) return end
+
+            if not Toggles["Esp/MercEnabled"].Value then MercHide(entityData) return end
+
+            if not humanoid or humanoid.Health <= 0 then
+                if objects.FrameHolder.Visible and not entityData.IsFading then
+                    entityData.IsFading = true
+                    entityData.HasFadedIn = false
+                    MercFade(false, entityData)
+                    task.delay(Options["Esp/FadeTime"].Value + 0.1, function()
+                        entityData.IsFading = false
+                        entityData.HealthRatio = nil
+                        entityData.LastAlpha = nil
+                        MercHide(entityData)
+                        for _, obj in pairs(objects) do
+                            if CanChangeTransparency(entityData, obj) then
+                                local tp = GlobalState.Utility.GetTransparency(obj)
+                                if tp then obj[tp] = 0 end
+                            end
+                        end
+                    end)
+                end
+                return
+            end
+
+            local rootCFrame = entityData.LastCFrame
+            local rootPosition = rootCFrame.Position
+            local screenPoint, onScreen = CurrentCamera:WorldToViewportPoint(rootPosition)
+
+            local maxDistance = Options["Esp/MaxDistance"].Value or 500
+            local distance = (CurrentCamera.CFrame.Position - rootPosition).Magnitude
+            if distance > maxDistance then MercHide(entityData) return end
+
+            local health, maxHealth = GetMercHealth(mercModel)
+            entityData.MaxHealth = maxHealth
+            local ratio = math.clamp(health / math.max(maxHealth, 1), 0, 1)
+            entityData.HealthRatio = (entityData.HealthRatio or ratio) + (ratio - (entityData.HealthRatio or ratio)) * (Options["Esp/HealthBarSpeed"].Value or 0.1)
+
+            if ratio == 1 and not entityData.HasFadedIn then
+                entityData.HasFadedIn = true
+                entityData.LastAlpha = nil
+                for _, obj in pairs(objects) do
+                    if CanChangeTransparency(entityData, obj) then
+                        local tp = GlobalState.Utility.GetTransparency(obj)
+                        if tp then obj[tp] = 1 end
+                    end
+                end
+                MercShow(entityData)
+                MercFade(true, entityData)
+            else
+                MercShow(entityData)
+            end
+
+            if not onScreen then
+                entityData.IsOnScreen = false
+                MercHide(entityData)
+                return
+            end
+            entityData.IsOnScreen = true
+
+            local minX, minY, maxX, maxY = GetBoundingBoxes(rootCFrame, screenPoint, Options["Esp/Scale"].Value, nil)
+            local left = minX - 1
+            local top = minY - 1
+            local width = (maxX + 1) - left
+            local height = (maxY + 1) - top
+            objects.FrameHolder.Position = UDim2.fromOffset(left, top)
+            objects.FrameHolder.Size = UDim2.fromOffset(width, height)
+
+            objects.BoxGradient.Color = ColorSequence.new {
+                ColorSequenceKeypoint.new(0, Options["Esp/MercBoxColor1"].Value),
+                ColorSequenceKeypoint.new(1, Options["Esp/MercBoxColor2"].Value),
+            }
+            objects.Box.Visible = Toggles["Esp/MercBox"].Value
+            objects.FullBoxHolder.Visible = Toggles["Esp/MercBox"].Value
+
+            objects.BoxFillGradient.Color = ColorSequence.new {
+                ColorSequenceKeypoint.new(0, Options["Esp/MercBoxFillColor1"].Value),
+                ColorSequenceKeypoint.new(1, Options["Esp/MercBoxFillColor2"].Value),
+            }
+            objects.BoxFillGradient.Transparency = NumberSequence.new {
+                NumberSequenceKeypoint.new(0, Options["Esp/MercBoxFillColor1"].Transparency or 0.5),
+                NumberSequenceKeypoint.new(1, Options["Esp/MercBoxFillColor2"].Transparency or 0.5),
+            }
+            objects.BoxFill.Visible = Toggles["Esp/MercBoxFill"].Value and Toggles["Esp/MercBox"].Value
+
+            objects.Name.Visible = Toggles["Esp/MercName"].Value
+            objects.Name.TextColor3 = Options["Esp/MercNameColor"].Value
+            ApplyMercText(objects.Name, CleanMercName(mercModel.Name))
+
+            objects.Distance.Visible = Toggles["Esp/MercDistance"].Value
+            objects.Distance.TextColor3 = Options["Esp/MercDistanceColor"].Value
+            ApplyMercText(objects.Distance, math.floor(distance) .. "m")
+
+            if Toggles["Esp/FadeOnDistance"].Value then
+                local fadeStart = maxDistance * 0.6
+                local fadeAlpha = math.clamp((distance - fadeStart) / (maxDistance - fadeStart), 0, 1)
+                MercSetTransparency(entityData, fadeAlpha)
+            else
+                MercSetTransparency(entityData, 0)
+            end
+
+            local healthBarEnabled = Toggles["Esp/MercHealthBar"].Value
+            objects.HealthBarHolder.Visible = healthBarEnabled
+            if healthBarEnabled then
+                local thickness = Options["Esp/HealthBarThickness"].Value or 1
+                local offset = 4
+                local currentRatio = entityData.HealthRatio or 1
+                local sideChanged = entityData.LastHealthBarSide ~= "Left"
+                entityData.LastHealthBarSide = "Left"
+                if sideChanged then
+                    objects.HealthBarHolder.AnchorPoint = Vector2.new(1, 0)
+                    objects.HealthBarHolder.Size = UDim2.new(0, thickness, 1, 2)
+                    objects.HealthBarHolder.Position = UDim2.new(0, -offset, 0, -1)
+                    objects.HealthBarFill.AnchorPoint = Vector2.new(0, 1)
+                    objects.HealthBarFill.Position = UDim2.new(0, 0, 1, 0)
+                    objects.HealthBarFillGradient.Rotation = 90
+                end
+                objects.HealthBarFill.Size = UDim2.new(1, 0, currentRatio, 0)
+
+                objects.HealthBarFillGradient.Color = ColorSequence.new {
+                    ColorSequenceKeypoint.new(0, Options["Esp/MercHealthBarColor1"].Value),
+                    ColorSequenceKeypoint.new(0.5, Options["Esp/MercHealthBarColor1"].Value:Lerp(Options["Esp/MercHealthBarColor2"].Value, 0.5)),
+                    ColorSequenceKeypoint.new(1, Options["Esp/MercHealthBarColor2"].Value),
+                }
+
+                local numLabel = objects.HealthBarNumber
+                local showNumber = Toggles["Esp/MercHealthBarNumber"].Value
+                numLabel.Visible = showNumber and healthBarEnabled
+                if showNumber then
+                    local maxHp = entityData.MaxHealth or 100
+                    local realHealth = math.clamp(math.round(currentRatio * maxHp), 0, maxHp)
+                    if numLabel.Text ~= tostring(realHealth) then
+                        numLabel.Text = tostring(realHealth)
+                    end
+                    numLabel.TextColor3 = Options["Esp/MercHealthBarNumberColor"].Value
+                    local posXOffset = 5 - ((Options["Esp/HealthBarThickness"].Value or 1) - 1)
+                    numLabel.AnchorPoint = Vector2.new(1, 0.5)
+                    numLabel.Position = UDim2.new(0, -(offset) + posXOffset, 1 - currentRatio, 0)
+                end
+            end
+        end
+    end
+
+    local function RemoveMercEntity(mercModel)
+        local entity = mercESP.entities[mercModel]
+        if entity then
+            if entity.Objects then
+                for _, obj in pairs(entity.Objects) do
+                    RenderObjectUtils.DestroyRenderObject(obj)
+                end
+            end
+            mercESP.entities[mercModel] = nil
+        end
+    end
+
+    local function ScanAIHunter()
+        local aiHunter = Workspace:FindFirstChild("AIHunter")
+        if not aiHunter then return end
+
+        local seen = {}
+        for _, child in ipairs(aiHunter:GetChildren()) do
+            if child:IsA("Model") then
+                local humanoid = child:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    seen[child] = true
+                    if not mercESP.entities[child] then
+                        AddMercEntity(child)
+                    end
+                end
+            end
+        end
+
+        for mercModel, _ in pairs(mercESP.entities) do
+            if not seen[mercModel] or not mercModel.Parent then
+                RemoveMercEntity(mercModel)
+            end
+        end
+    end
+
+    task.spawn(function()
+        local aiHunter = Workspace:WaitForChild("AIHunter", 30)
+        if not aiHunter then return end
+        aiHunter.ChildAdded:Connect(function(child)
+            if child:IsA("Model") and child:FindFirstChildOfClass("Humanoid") then
+                if not mercESP.entities[child] then
+                    AddMercEntity(child)
+                end
+            end
+        end)
+        aiHunter.ChildRemoved:Connect(function(child)
+            RemoveMercEntity(child)
+        end)
+    end)
+
+    task.spawn(function()
+        while true do
+            task.wait(1)
+            ScanAIHunter()
+        end
+    end)
+
+    local mercRenderConn = RunService.RenderStepped:Connect(function()
+        for mercModel, entity in pairs(mercESP.entities) do
+            if entity and entity.Render then
+                entity.Render()
+            end
+        end
+    end)
+
+    local function RefreshMercElements()
+        for _, entity in pairs(mercESP.entities) do
+            if entity and entity.Render then entity.Render() end
+        end
+    end
+
+    Toggles["Esp/MercEnabled"]:OnChanged(RefreshMercElements)
+    Toggles["Esp/MercBox"]:OnChanged(RefreshMercElements)
+    Toggles["Esp/MercBoxFill"]:OnChanged(RefreshMercElements)
+    Toggles["Esp/MercName"]:OnChanged(RefreshMercElements)
+    Toggles["Esp/MercDistance"]:OnChanged(RefreshMercElements)
+    Toggles["Esp/MercHealthBar"]:OnChanged(RefreshMercElements)
+    Toggles["Esp/MercHealthBarNumber"]:OnChanged(RefreshMercElements)
+
+    Options["Esp/MercBoxColor1"]:OnChanged(RefreshMercElements)
+    Options["Esp/MercBoxColor2"]:OnChanged(RefreshMercElements)
+    Options["Esp/MercBoxFillColor1"]:OnChanged(RefreshMercElements)
+    Options["Esp/MercBoxFillColor2"]:OnChanged(RefreshMercElements)
+    Options["Esp/MercNameColor"]:OnChanged(RefreshMercElements)
+    Options["Esp/MercDistanceColor"]:OnChanged(RefreshMercElements)
+    Options["Esp/MercHealthBarColor1"]:OnChanged(RefreshMercElements)
+    Options["Esp/MercHealthBarColor2"]:OnChanged(RefreshMercElements)
+    Options["Esp/MercHealthBarNumberColor"]:OnChanged(RefreshMercElements)
+
+    local crateESP = {
+        enabled = false,
+        distance = 1000,
+        fadeDistance = true,
+        color = Color3.fromRGB(255, 255, 255),
+        transparency = 0,
+        items = {},
+        holder = nil,
+    }
+
+    crateESP.holder = RenderObjectUtils.new("ScreenGui", { Parent = UIHolder, Name = "CrateESP" })
+
+    local CratesESPGroup = EspTab:AddRightGroupbox("Crates")
+
+    local CratesESPToggle = CratesESPGroup:AddToggle("Esp/CrateESP", { Text = "Enabled", Default = false })
+    CratesESPToggle:AddKeyPicker("Esp/CrateESPBind", { Default = "None", SyncToggleState = true, Mode = "Toggle", Text = "Crates ESP", NoUI = false })
+    CratesESPToggle:AddColorPicker("Esp/CrateESPColor", { Default = Color3.fromRGB(255, 255, 255), Title = "Crate Color" })
+    CratesESPGroup:AddSlider("Esp/CrateESPDistance", { Text = "Max Distance", Default = 1000, Min = 50, Max = 10000, Rounding = 0 })
+    CratesESPGroup:AddToggle("Esp/CrateESPFade", { Text = "Fade On Distance", Default = true })
+    CratesESPGroup:AddSlider("Esp/CrateESPTransparency", { Text = "Transparency", Default = 0, Min = 0, Max = 1, Rounding = 2 })
+
+    Toggles["Esp/CrateESP"]:OnChanged(function() crateESP.enabled = Toggles["Esp/CrateESP"].Value end)
+    Options["Esp/CrateESPColor"]:OnChanged(function() crateESP.color = Options["Esp/CrateESPColor"].Value end)
+    Options["Esp/CrateESPDistance"]:OnChanged(function() crateESP.distance = Options["Esp/CrateESPDistance"].Value end)
+    Toggles["Esp/CrateESPFade"]:OnChanged(function() crateESP.fadeDistance = Toggles["Esp/CrateESPFade"].Value end)
+    Options["Esp/CrateESPTransparency"]:OnChanged(function() crateESP.transparency = Options["Esp/CrateESPTransparency"].Value end)
+
+    local function GetCrateInfo(crate)
+        local bypassable = crate:FindFirstChild("#Bypassable")
+        if not bypassable then return nil, nil end
+        local diff = bypassable:FindFirstChild("Difficulty")
+        local item = bypassable:FindFirstChild("Item")
+        local level = diff and diff:IsA("IntValue") and diff.Value or nil
+        local drop = item and item:IsA("StringValue") and item.Value or nil
+        return level, drop
+    end
+
+    local function GetCratePos(crate)
+        local ok, cf = pcall(function()
+            local primary = crate.PrimaryPart or crate:FindFirstChildWhichIsA("BasePart")
+            if primary then return primary.Position end
+            local boxCF = crate:GetBoundingBox()
+            return boxCF.Position
+        end)
+        return ok and cf or nil
+    end
+
+    local function AddCrateLabel(crate)
+        local level, drop = GetCrateInfo(crate)
+        if not level and not drop then return end
+
+        local line1 = RenderObjectUtils.new("TextLabel", {
+            Parent = crateESP.holder,
+            Text = level and ("Level " .. level) or "Level ?",
+            FontFace = SmallestPixel7,
+            TextSize = 9,
+            TextColor3 = crateESP.color,
+            TextTransparency = crateESP.transparency,
+            BackgroundTransparency = 1,
+            AnchorPoint = Vector2.new(0.5, 1),
+            Position = UDim2.new(0, -1000, 0, -1000),
+            Size = UDim2.fromOffset(0, 0),
+            Visible = false,
+            ZIndex = 10,
+        })
+        RenderObjectUtils.new("UIStroke", { Parent = line1, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+        FixTextPadding(line1)
+
+        local line2 = RenderObjectUtils.new("TextLabel", {
+            Parent = crateESP.holder,
+            Text = drop or "?",
+            FontFace = SmallestPixel7,
+            TextSize = 9,
+            TextColor3 = crateESP.color,
+            TextTransparency = crateESP.transparency,
+            BackgroundTransparency = 1,
+            AnchorPoint = Vector2.new(0.5, 0),
+            Position = UDim2.new(0, -1000, 0, -1000),
+            Size = UDim2.fromOffset(0, 0),
+            Visible = false,
+            ZIndex = 10,
+        })
+        RenderObjectUtils.new("UIStroke", { Parent = line2, Thickness = 1, Color = Color3.fromRGB(0, 0, 0), LineJoinMode = "Miter" })
+        FixTextPadding(line2)
+
+        crateESP.items[crate] = { Line1 = line1, Line2 = line2 }
+    end
+
+    local function RemoveCrateLabel(crate)
+        local data = crateESP.items[crate]
+        if data then
+            if data.Line1 then data.Line1:Destroy() end
+            if data.Line2 then data.Line2:Destroy() end
+            crateESP.items[crate] = nil
+        end
+    end
+
+    local function ClearAllCrateLabels()
+        for crate, _ in pairs(crateESP.items) do
+            RemoveCrateLabel(crate)
+        end
+    end
+
+    local function UpdateCrateESP()
+        if not crateESP.enabled then
+            if next(crateESP.items) ~= nil then
+                ClearAllCrateLabels()
+            end
+            return
+        end
+
+        local seen = {}
+        local camPos = CurrentCamera.CFrame.Position
+        local maxDist = crateESP.distance
+
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj.Name == "Crate" and obj:IsA("Model") then
+                seen[obj] = true
+                if not crateESP.items[obj] then
+                    AddCrateLabel(obj)
+                end
+            end
+        end
+
+        for crate, data in pairs(crateESP.items) do
+            if not seen[crate] or not crate.Parent then
+                RemoveCrateLabel(crate)
+            else
+                local pos = GetCratePos(crate)
+                if not pos then
+                    data.Line1.Visible = false
+                    data.Line2.Visible = false
+                else
+                    local distance = (camPos - pos).Magnitude
+                    local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(pos)
+
+                    if onScreen and distance <= maxDist then
+                        local level, drop = GetCrateInfo(crate)
+
+                        local t1 = level and ("Level " .. level) or "Level ?"
+                        if data.Line1.Text ~= t1 then
+                            data.Line1.Text = t1
+                            FixTextPadding(data.Line1)
+                        end
+
+                        local t2 = drop or "?"
+                        if data.Line2.Text ~= t2 then
+                            data.Line2.Text = t2
+                            FixTextPadding(data.Line2)
+                        end
+
+                        local textCase = Options["Esp/TextCases"].Value
+                        local textWrapper = Options["Esp/TextWrapper"].Value
+                        local function wrap(str)
+                            local s = str
+                            if textCase == "UPPER" then s = string.upper(s)
+                            elseif textCase == "lower" then s = string.lower(s) end
+                            if textWrapper == "[Brackets]" then s = "[" .. s .. "]"
+                            elseif textWrapper == "{Braces}" then s = "{" .. s .. "}" end
+                            return s
+                        end
+
+                        local final1 = wrap(t1)
+                        local final2 = wrap(t2)
+                        if data.Line1.Text ~= final1 then data.Line1.Text = final1; FixTextPadding(data.Line1) end
+                        if data.Line2.Text ~= final2 then data.Line2.Text = final2; FixTextPadding(data.Line2) end
+
+                        data.Line1.Position = UDim2.fromOffset(screenPos.X, screenPos.Y - 6)
+                        data.Line2.Position = UDim2.fromOffset(screenPos.X, screenPos.Y - 6)
+                        data.Line1.TextColor3 = crateESP.color
+                        data.Line2.TextColor3 = crateESP.color
+                        data.Line1.ZIndex = (1000 - math.floor(distance))
+                        data.Line2.ZIndex = (1000 - math.floor(distance))
+
+                        local baseTransp = crateESP.transparency
+                        if crateESP.fadeDistance then
+                            local fadeStart = maxDist * 0.6
+                            local fadeAlpha = math.clamp((distance - fadeStart) / (maxDist - fadeStart), 0, 1)
+                            data.Line1.TextTransparency = baseTransp + fadeAlpha * (1 - baseTransp)
+                            data.Line2.TextTransparency = baseTransp + fadeAlpha * (1 - baseTransp)
+                        else
+                            data.Line1.TextTransparency = baseTransp
+                            data.Line2.TextTransparency = baseTransp
+                        end
+
+                        data.Line1.Visible = true
+                        data.Line2.Visible = true
+                    else
+                        data.Line1.Visible = false
+                        data.Line2.Visible = false
+                    end
+                end
+            end
+        end
+    end
+
+    RunService.RenderStepped:Connect(UpdateCrateESP)
+
+    local function CleanItemName(name)
+        local clean = name:gsub("#%d+", "")
+        clean = clean:gsub("%s+$", "")
+        clean = clean:gsub("^%s+", "")
+        return clean
+    end
+
+    local function IsItemModel(obj)
+        if not obj or not obj.Parent then return false end
+        if not (obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("MeshPart")) then return false end
+        if obj.Parent.Name ~= "Tools" then return false end
+        if obj.Name == "Bullet" or obj.Name == "Model" or obj.Name == "Part" then return false end
+        return true
+    end
+
+    local function GetItemPosition(obj)
+        if obj:IsA("Model") then
+            local cf, _ = obj:GetBoundingBox()
+            return cf.Position
+        else
+            return obj.Position
+        end
+    end
+
+    local function GetItemContainer()
+        local map = Workspace:FindFirstChild("Map")
+        if not map then return nil end
+        local ignore = map:FindFirstChild("Ignore")
+        if not ignore then return nil end
+        return ignore:FindFirstChild("Tools")
+    end
+
+    local function FixItemTextPadding(label)
+        local textWidth, textHeight = GlobalState.Utility.GetTextBounds(label.Text, label.FontFace, label.TextSize)
+        label.Size = UDim2.fromOffset(textWidth, textHeight)
+    end
+
+    local function AddItemLabel(item)
+        local displayName = CleanItemName(item.Name)
+        local label = RenderObjectUtils.new("TextLabel", {
+            Parent = itemESP.holder,
+            Text = displayName,
+            FontFace = SmallestPixel7,
+            TextSize = 9,
+            TextColor3 = itemESP.color,
+            TextTransparency = itemESP.transparency,
+            BackgroundTransparency = 1,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0, -1000, 0, -1000),
+            Size = UDim2.fromOffset(0, 0),
+            Visible = false,
+            ZIndex = 10,
+        })
+        local stroke = RenderObjectUtils.new("UIStroke", {
+            Parent = label,
+            Thickness = 1,
+            Color = Color3.fromRGB(0, 0, 0),
+            LineJoinMode = "Miter",
+        })
+        FixItemTextPadding(label)
+        itemESP.items[item] = { Label = label, Stroke = stroke }
+    end
+
+    local function RemoveItemLabel(item)
+        local data = itemESP.items[item]
+        if data then
+            if data.Label then data.Label:Destroy() end
+            itemESP.items[item] = nil
+        end
+    end
+
+    local function ClearAllItemLabels()
+        for item, _ in pairs(itemESP.items) do
+            RemoveItemLabel(item)
+        end
+    end
+
+    local function UpdateItemESP()
+        if not itemESP.enabled then
+            if next(itemESP.items) ~= nil then
+                ClearAllItemLabels()
+            end
+            return
+        end
+
+        local container = GetItemContainer()
+        if not container then return end
+
+        local seen = {}
+        local camPos = CurrentCamera.CFrame.Position
+        local maxDist = itemESP.distance
+
+        for _, obj in ipairs(container:GetChildren()) do
+            if IsItemModel(obj) then
+                seen[obj] = true
+                if not itemESP.items[obj] then
+                    AddItemLabel(obj)
+                end
+            end
+        end
+
+        for item, data in pairs(itemESP.items) do
+            if not seen[item] or not item.Parent then
+                RemoveItemLabel(item)
+            else
+                local label = data.Label
+                local stroke = data.Stroke
+                local objPos = GetItemPosition(item)
+                local distance = (camPos - objPos).Magnitude
+                local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(objPos)
+
+                if onScreen and distance <= maxDist then
+                    label.Position = UDim2.fromOffset(screenPos.X, screenPos.Y)
+                    label.TextColor3 = itemESP.color
+                    label.ZIndex = (1000 - math.floor(distance))
+
+                    local baseTransp = itemESP.transparency
+                    if itemESP.fadeDistance then
+                        local fadeStart = maxDist * 0.6
+                        local fadeAlpha = math.clamp((distance - fadeStart) / (maxDist - fadeStart), 0, 1)
+                        label.TextTransparency = baseTransp + fadeAlpha * (1 - baseTransp)
+                        stroke.Transparency = baseTransp + fadeAlpha * (1 - baseTransp)
+                    else
+                        label.TextTransparency = baseTransp
+                        stroke.Transparency = baseTransp
+                    end
+
+                    label.Visible = true
+
+                    local cleanName = CleanItemName(item.Name)
+                    if label.Text ~= cleanName then
+                        label.Text = cleanName
+                        FixItemTextPadding(label)
+                    end
+
+                else
+                    label.Visible = false
+                end
+            end
+        end
+    end
+
+    RunService.RenderStepped:Connect(UpdateItemESP)
+
+    task.spawn(function()
+        local container = GetItemContainer()
+        if not container then
+            Workspace:WaitForChild("Map", 10)
+            local map = Workspace:FindFirstChild("Map")
+            if map then
+                map:WaitForChild("Ignore", 10)
+                local ignore = map:FindFirstChild("Ignore")
+                if ignore then
+                    ignore:WaitForChild("Tools", 10)
+                    container = ignore:FindFirstChild("Tools")
+                end
+            end
+        end
+        if container then
+            container.ChildAdded:Connect(function(obj)
+                if itemESP.enabled and IsItemModel(obj) then
+                    task.defer(function()
+                        if not itemESP.items[obj] and obj.Parent then
+                            AddItemLabel(obj)
+                        end
+                    end)
+                end
+            end)
+        end
+    end)
+
+    local TeleportSettings = Tabs.Teleports:AddRightGroupbox("Settings")
+    TeleportSettings:AddDropdown("TeleportType", {
+        Values = { "Default", "Bypass" },
+        Default = "Default",
+        Text = "Teleport Type",
+    })
+
+    local function GetTeleportCFrame(position)
+        if Options.TeleportType and Options.TeleportType.Value == "Bypass" then
+            local tween_s = game:GetService('TweenService')
+            local tweeninfo = TweenInfo.new(0, Enum.EasingStyle.Linear)
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart') then
+                local cf = CFrame.new(position)
+                tween_s:Create(LocalPlayer.Character.HumanoidRootPart, tweeninfo, { CFrame = cf }):Play()
+            end
+        else
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart') then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(position)
+            end
+        end
+    end
+
+    local function teleportToPosition(position)
+        GetTeleportCFrame(position)
+    end
+
+    local function teleportToPeanutBox()
+        local peanutBox = workspace.Map.Main:FindFirstChild("PeanutBox")
+        if peanutBox and peanutBox:IsA("Model") then
+            local targetPart = peanutBox.PrimaryPart or peanutBox:FindFirstChildWhichIsA("BasePart")
+            if targetPart then
+                teleportToPosition(targetPart.Position)
+            end
+        end
+    end
+
+    local ArtifactsGroup = Tabs.Teleports:AddLeftGroupbox('Artifacts')
+    local ArmorsGroup = Tabs.Teleports:AddLeftGroupbox('Armors')
+    local PylonsGroup = Tabs.Teleports:AddRightGroupbox('Pylons')
+    local ButtonsGroup = Tabs.Teleports:AddRightGroupbox('Buttons')
+    local OthersGroup = Tabs.Teleports:AddLeftGroupbox('Others')
+    local ItemsGroup = Tabs.Teleports:AddRightGroupbox('Items')
+
+    ArtifactsGroup:AddButton('Artifact A', function()
+        teleportToPosition(Vector3.new(-1361.90576, -455.134979, -1564.68494, 0.651846945, 7.6124401e-08, -0.758350551, 2.0347124e-09, 1, 1.02130507e-07, 0.758350551, -6.81164849e-08, 0.651846945))
+    end)
+
+    ArtifactsGroup:AddButton('Artifact B', function()
+        teleportToPosition(Vector3.new(1405.39502, -252.643265, -1850.82043, -0.959468126, -0.114206277, 0.25763905, -0.249978572, -0.0772145987, -0.965167701, 0.130121693, -0.990451872, 0.0455358028))
+    end)
+
+    ArtifactsGroup:AddButton('Artifact C', function()
+        teleportToPosition(Vector3.new(-754.67572, 122.680908, -3171.29468, 0.00634968281, -0.999970317, -0.00437764823, 0.909837723, 0.00759369135, -0.41489476, 0.414915681, -0.00134849548, 0.909858882))
+    end)
+
+    ArtifactsGroup:AddButton('Artifact D', function()
+        teleportToPosition(Vector3.new(-1770.58325, -196.50827, -1314.29663, -0.964809418, 5.09639442e-09, -0.262950182, 2.42157694e-09, 1, 1.04964153e-08, 0.262950182, 9.49028678e-09, -0.964809418))
+    end)
+
+    ArmorsGroup:AddButton('Hornet Armor', function()
+        teleportToPosition(Vector3.new(-1789.09998, -51.5196495, -714.00824, 0.0603157803, -3.31795178e-08, -0.998179317, -2.87556308e-08, 1, -3.49776172e-08, 0.998179317, 3.08129771e-08, 0.0603157803))
+    end)
+
+    ArmorsGroup:AddButton('Leech Armor', function()
+        teleportToPosition(Vector3.new(-854.493713, 307.285858, -1381.02466, -0.768296242, 1.3785125e-08, -0.640094459, -4.967508e-08, 1, 8.11603655e-08, 0.640094459, 9.41519431e-08, -0.768296242))
+    end)
+
+    ArmorsGroup:AddButton('Frog Armor', function()
+        teleportToPosition(Vector3.new(-1801.5658, -224.104767, -1418.93408, -0.452354759, -3.68769193e-08, 0.891838074, -2.26068728e-08, 1, 2.988277e-08, -0.891838074, -6.64405686e-09, -0.452354759))
+    end)
+
+    PylonsGroup:AddButton('Pylon 1', function()
+        teleportToPosition(Vector3.new(-1548.03918, 97.9687271, -1184.42932, 0.0871878266, -0.996191859, -5.66244125e-07, -5.66244125e-07, -5.96046448e-07, 1, -0.996191859, -0.0871878564, -5.96046448e-07))
+    end)
+
+    PylonsGroup:AddButton('Pylon 2', function()
+        teleportToPosition(Vector3.new(-1383.99011, -95.7157364, -1664.79944, 0.772421837, 0.0509949327, 0.633059323, -0.138757274, 0.986241221, 0.08985883, -0.619766951, -0.157250434, 0.768870354))
+    end)
+
+    PylonsGroup:AddButton('Pylon 3', function()
+        teleportToPosition(Vector3.new(-1251.32068, -53.2294846, -1003.33405, -1, 0, 0, 0, -1, 0, 0, 0, 1))
+    end)
+
+    ButtonsGroup:AddButton('Button 1', function()
+        teleportToPosition(Vector3.new(-379.444, -4.071, 1101.608, 0.922, 0.000, 0.388, 0.000, 1.000, 0.000, -0.388, 0.000, 0.922))
+    end)
+
+    ButtonsGroup:AddButton('Button 2', function()
+        teleportToPosition(Vector3.new(798.298401, 9.53286839, -1114.27148, 0.344571114, -0.398527175, 0.849968731, 0.526380777, 0.83171159, 0.176575959, -0.777299225, 0.386564255, 0.496360838))
+    end)
+
+    ButtonsGroup:AddButton('Button 3', function()
+        teleportToPosition(Vector3.new(-684.225769, 202.993881, -942.549927, 0.325469255, 0.0494334027, 0.944259584, -0.0129578188, 0.998771846, -0.047820881, -0.945463836, 0.00332868285, 0.325710118))
+    end)
+
+    ButtonsGroup:AddButton('Button 4', function()
+        teleportToPosition(Vector3.new(-1589.79089, 33.9811859, 998.818726, 0.97990799, 0.0395616181, 0.195487246, -0.0370482914, 0.999177277, -0.0164980348, -0.195979103, 0.00892408751, 0.980567455))
+    end)
+
+    ButtonsGroup:AddButton('Button 5', function()
+        teleportToPosition(Vector3.new(-2356.16699, 3.37900019, -807.586975, 0.761352718, -0.557326376, 0.331254393, 0.563296258, 0.821594596, 0.0876339898, -0.320997566, 0.119873963, 0.939463079))
+    end)
+
+    OthersGroup:AddButton('Lair', function()
+        teleportToPosition(Vector3.new(-1676.82996, -16.1449394, -521.251587, -0.906296611, 0, -0.422642082, 0, 1, 0, 0.422642082, 0, -0.906296611))
+    end)
+
+    OthersGroup:AddButton('Lighthouse', function()
+        teleportToPosition(Vector3.new(-1545.8512, 230.858521, -198.817429, 1, 0, 0, 0, -1, 0, 0, 0, -1))
+    end)
+
+    OthersGroup:AddButton('Facility', function()
+        teleportToPosition(Vector3.new(-1615.73218, -44.9032974, -1534.52466, -0.0871315002, 0, 0.996196866, 0, 1, 0, -0.996196866, 0, -0.0871315002))
+    end)
+
+    OthersGroup:AddButton('Facility v2', function()
+        teleportToPosition(Vector3.new(-1786.96912, -193.726181, -1368.29736, 0.86847502, -1.3552881e-09, 0.495732903, 2.07229558e-08, 1, -3.35706609e-08, -0.495732903, 3.94283326e-08, 0.86847502))
+    end)
+
+    OthersGroup:AddButton('Ship', function()
+        teleportToPosition(Vector3.new(-340.644653, 27.418045, 894.642578, 0.925113857, 0.143077254, -0.351700485, -0.182772607, 0.979712605, -0.0822031423, 0.332804024, 0.140328467, 0.932496369))
+    end)
+
+    OthersGroup:AddButton('Ship v2', function()
+        teleportToPosition(Vector3.new(-344.970428, 28.07477, 844.501038, -0.394033402, 2.55767474e-09, 0.919096112, -1.77191861e-08, 1, -1.0379356e-08, -0.919096112, -2.03754471e-08, -0.394033402))
+    end)
+
+    OthersGroup:AddButton('Generators', function()
+        teleportToPosition(Vector3.new(548.078979, -7.42856884, -543.734436, 0.999971807, 0, 0.00750996405, 0, 1, 0, -0.00750996405, 0, 0.999971807))
+    end)
+
+    OthersGroup:AddButton('Observatory', function()
+        teleportToPosition(Vector3.new(491.733887, 168.125641, -1198.16577, -0.779358447, -9.44750944e-09, -0.626578331, -6.47262794e-08, 1, 6.54307115e-08, 0.626578331, 9.15500635e-08, -0.779358447))
+    end)
+
+    OthersGroup:AddButton('Dome', function()
+        teleportToPosition(Vector3.new(-811.165039, 302.044769, -1374.07373, -0.592320919, 0.013302397, 0.805592358, 0.11338532, 0.991289496, 0.0669991225, -0.797684014, 0.131027326, -0.588669896))
+    end)
+
+    OthersGroup:AddButton('Hangar', function()
+        teleportToPosition(Vector3.new(-1618.50464, 19.4380608, -2373.5564, -0.000115871429, -0.970283508, 0.241971388, -1.00000012, 8.58902931e-05, -0.000133551657, 0.000108763576, -0.241971403, -0.970283628))
+    end)
+
+    OthersGroup:AddButton('Military Camp', function()
+        teleportToPosition(Vector3.new(-1060.0896, 265.254456, -1779.07434, -0.748084426, -7.04479941e-09, 0.663603544, -3.58650674e-08, 1, -2.98149381e-08, -0.663603544, -4.6104276e-08, -0.748084426))
+    end)
+
+    OthersGroup:AddButton('Docks', function()
+        teleportToPosition(Vector3.new(-2003.31616, 8.6466732, -1554.91443, 1, 0, 0, 0, -1, 0, 0, 0, -1))
+    end)
+
+    OthersGroup:AddButton('The Giver House', function()
+        teleportToPosition(Vector3.new(-784.747375, 7.41996861, 431.580719, -0.548385859, 7.19120496e-09, 0.83622545, 8.66067662e-09, 1, -2.92004088e-09, -0.83622545, 5.64096903e-09, -0.548385859))
+    end)
+
+    OthersGroup:AddButton('Emerald Forest', function()
+        teleportToPosition(Vector3.new(-1150.80725, 161.632538, -1954.87634, -0.447910905, 1.95598808e-08, -0.894078195, 4.91844396e-08, 1, -2.76303047e-09, 0.894078195, -4.52123246e-08, -0.447910905))
+    end)
+
+    OthersGroup:AddButton('Greenhouse', function()
+        teleportToPosition(Vector3.new(-1365.89282, 305.278229, -1217.66406, 0.405513078, -5.71131729e-08, 0.914089262, -2.32477184e-08, 1, 7.27942364e-08, -0.914089262, -5.07695006e-08, 0.405513078))
+    end)
+
+    OthersGroup:AddButton('Radio Station', function()
+        teleportToPosition(Vector3.new(-1061.86304, 498.490936, -1391.46838, -0.240592584, 8.59774119e-08, 0.970626175, 7.9105348e-08, 1, -6.89711968e-08, -0.970626175, 6.01877588e-08, -0.240592584))
+    end)
+
+    OthersGroup:AddButton('Hunting tower', function()
+        teleportToPosition(Vector3.new(-654.954407, 137.66452, -301.760803, 0.279342622, -5.74172931e-09, -0.960191488, 1.59596354e-08, 1, -1.33673661e-09, 0.960191488, -1.49508992e-08, 0.279342622))
+    end)
+
+    OthersGroup:AddButton('Warehouse', function()
+        teleportToPosition(Vector3.new(-826.067139, 60.9126968, -562.256531, -0.201184407, -4.87177587e-08, 0.979553401, -1.69559389e-08, 1, 4.62521896e-08, -0.979553401, -7.30402849e-09, -0.201184407))
+    end)
+
+    OthersGroup:AddButton('Bungalows', function()
+        teleportToPosition(Vector3.new(-320.982, -6.202, -2303.238, -0.972, 0.000, 0.233, 0.000, 1.000, 0.000, -0.233, 0.000, -0.972))
+    end)
+
+    OthersGroup:AddButton('Bunker', function()
+        teleportToPosition(Vector3.new(-1544.356, 210.345, -1506.424, 0.051, 0.000, 0.999, 0.000, 1.000, 0.000, -0.999, 0.000, 0.051))
+    end)
+
+    ItemsGroup:AddButton('Gatling Gun', function()
+        teleportToPosition(Vector3.new(-1375.44922, 175.637512, -1501.44141, 0.99944979, -0.00715781003, 0.0323868245, 0.00734223425, 0.999957502, -0.00557908462, -0.032345511, 0.00581380678, 0.999459863))
+    end)
+
+    ItemsGroup:AddButton('Ballistic Vest', function()
+        teleportToPosition(Vector3.new(-714.689392, -8.73081493, 869.867676, 0.82139802, 0.567076266, -0.0610719323, -0.0476144552, -0.0385253429, -0.998122573, -0.568364441, 0.822763801, -0.00464367867))
+    end)
+
+    ItemsGroup:AddButton('Assistant Drone', function()
+        teleportToPosition(Vector3.new(-96.0948868, 234.422852, -2790.96899, -0.0125954151, 0.814679682, 0.579774439, -0.999861181, -0.00393784046, -0.0161882937, -0.0109052062, -0.579897881, 0.814616203))
+    end)
+
+    ItemsGroup:AddButton('Shield Pack / Steel Sword', function()
+        teleportToPosition(Vector3.new(-1320.638, 164.314, -1633.477, 0.407, 0.000, -0.914, 0.000, 1.000, 0.000, 0.914, 0.000, 0.407))
+    end)
+
+    ItemsGroup:AddButton('Jack', function()
+        teleportToPosition(Vector3.new(-1722.069, 5.664, 132.524, -0.447, 0.000, -0.894, 0.000, 1.000, 0.000, 0.894, 0.000, -0.447))
+    end)
+
+    ItemsGroup:AddButton('Squid Scooter', function()
+        teleportToPosition(Vector3.new(-424.265, -247.506, -587.039, -424.265, -247.506, -587.039, -0.754, 0.000, -0.657, 0.000, 1.000, 0.000))
+    end)
+
+    ItemsGroup:AddButton('Master Bypass Console', function()
+        teleportToPosition(Vector3.new(-1573.7373, -141.893097, -1429.42957, -0.977910817, -2.36143762e-08, -0.209022686, -3.50866252e-08, 1, 5.11772882e-08, 0.209022686, 5.73807206e-08, -0.977910817))
+    end)
+
+    ItemsGroup:AddButton('The Cache', function()
+        teleportToPeanutBox()
+    end)
+
+    local CratesGroup = Tabs.Teleports:AddRightGroupbox("Crates (Random)")
+
+    local function GetCrateLevel(crate)
+        local bypassable = crate:FindFirstChild("#Bypassable")
+        if not bypassable then return nil end
+        local diff = bypassable:FindFirstChild("Difficulty")
+        if diff and diff:IsA("IntValue") then
+            return diff.Value
+        end
+        return nil
+    end
+
+    local function GetRandomCrateByLevel(level)
+        local candidates = {}
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj.Name == "Crate" and obj:IsA("Model") then
+                local lvl = GetCrateLevel(obj)
+                if lvl == level then
+                    local ok, cf = pcall(function()
+                        local primary = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                        return primary and primary.Position or nil
+                    end)
+                    if ok and cf then
+                        table.insert(candidates, cf)
+                    end
+                end
+            end
+        end
+        if #candidates == 0 then return nil end
+        return candidates[math.random(1, #candidates)]
+    end
+
+    local function TeleportToRandomCrate(level)
+        local pos = GetRandomCrateByLevel(level)
+        if not pos then
+            Library:Notify({ Title = "Crates", Description = "Crate level " .. level .. " not found", Time = 2 })
+            return
+        end
+        local target = pos + Vector3.new(0, 5, 0)
+        GetTeleportCFrame(target)
+    end
+
+    CratesGroup:AddButton("1 Level", function() TeleportToRandomCrate(1) end)
+    CratesGroup:AddButton("2 Level", function() TeleportToRandomCrate(2) end)
+    CratesGroup:AddButton("3 Level", function() TeleportToRandomCrate(3) end)
+    CratesGroup:AddButton("4 Level", function() TeleportToRandomCrate(4) end)
+
+    local PlayerTeleportGroup = Tabs.Teleports:AddRightGroupbox('Player Teleport')
+
+    local function getPlayerList()
+        local players = {}
+        for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+            if player ~= game.Players.LocalPlayer then
+                table.insert(players, player.Name)
+            end
+        end
+        return players
+    end
+
+    local playerDropdown = PlayerTeleportGroup:AddDropdown('PlayerTeleportTarget', {
+        Values = getPlayerList(),
+        Default = 1,
+        Multi = false,
+        Text = 'Select Player'
+    })
+
+    PlayerTeleportGroup:AddButton('Teleport', function()
+        local targetPlayerName = Options.PlayerTeleportTarget.Value
+        local targetPlayer = game:GetService("Players"):FindFirstChild(targetPlayerName)
+        
+        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = targetPlayer.Character.HumanoidRootPart.Position
+            local tween_s = game:GetService('TweenService')
+            local tweeninfo = TweenInfo.new(0, Enum.EasingStyle.Linear)
+            local lp = game.Players.LocalPlayer
+
+            if lp.Character and lp.Character:FindFirstChild('HumanoidRootPart') then
+                local cf = CFrame.new(targetPos)
+                local a = tween_s:Create(lp.Character.HumanoidRootPart, tweeninfo, {CFrame = cf})
+                a:Play()
+            end
+        end
+    end)
+
+    MovementL:AddToggle('mov_bhop', {
+        Text = 'Bunny Hop', 
+        Default = false,
+    })
+        :AddKeyPicker("mov_bhopBind", { Default = "None", SyncToggleState = true, Mode = "Toggle", Text = "Bunny Hop", NoUI = false })
+
+    MovementL:AddSlider('mov_bhopspeed', {
+        Text = 'Bhop Speed',
+        Default = 25,
+        Min = 1,
+        Max = 150,
+        Rounding = 0,
+        Compact = false,
+    })
+
+    MovementL:AddToggle('infinity_jump', {
+        Text = 'Infinity Jump',
+        Default = false
+    })
+        :AddKeyPicker("infinity_jumpBind", { Default = "None", SyncToggleState = true, Mode = "Toggle", Text = "Infinity Jump", NoUI = false })
+
+    MovementL:AddToggle('NoAimSlowdown', {
+        Text = 'No Aim Slowdown',
+        Default = false,
+        Tooltip = "Removes the walking and jumping restrictions while aiming\nУбирает ограничение ходьбы и прыжка при прицеливании"
+    })
+
+    game:GetService("Players").PlayerAdded:Connect(function()
+        playerDropdown:SetValues(getPlayerList())
+    end)
+
+    game:GetService("Players").PlayerRemoving:Connect(function()
+        playerDropdown:SetValues(getPlayerList())
+    end)
+
+    local function IsAlive(player)
+        return player and player.Character and player.Character:FindFirstChild('Humanoid') and player.Character.Humanoid.Health > 0
+    end
+
+    local UserInputService = game:GetService("UserInputService")
+
+    game:GetService('RunService').RenderStepped:Connect(function()
+        if Toggles["mov_bhop"] and Toggles["mov_bhop"].Value then
+            if IsAlive(LocalPlayer) and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                LocalPlayer.Character.Humanoid.Jump = true
+                local speed = Options["mov_bhopspeed"].Value
+                local dir = CurrentCamera.CFrame.LookVector * Vector3.new(1,0,1)
+                local move = Vector3.new()
+
+                move = UserInputService:IsKeyDown(Enum.KeyCode.W) and move + dir or move
+                move = UserInputService:IsKeyDown(Enum.KeyCode.S) and move - dir or move
+                move = UserInputService:IsKeyDown(Enum.KeyCode.D) and move + Vector3.new(-dir.Z,0,dir.X) or move
+                move = UserInputService:IsKeyDown(Enum.KeyCode.A) and move + Vector3.new(dir.Z,0,-dir.X) or move
+
+                if move.Magnitude > 0 then
+                    move = move.Unit
+                    LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(
+                        move.X * speed,
+                        LocalPlayer.Character.HumanoidRootPart.Velocity.Y,
+                        move.Z * speed
+                    )
+                end
+            end
+        end
+    end)
+
+    UserInputService.JumpRequest:Connect(function()
+        if Toggles["infinity_jump"] and Toggles["infinity_jump"].Value and IsAlive(LocalPlayer) then
+            LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not Toggles.NoAimSlowdown or not Toggles.NoAimSlowdown.Value then return end
+        
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if hum then
+            hum.JumpPower = 50
+            hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+
+            if hum.MoveDirection.Magnitude > 0 then
+                local direction = hum.MoveDirection
+                local velY = root.Velocity.Y
+                root.Velocity = Vector3.new(direction.X * 16, velY, direction.Z * 16)
+            end
+        end
+    end)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            AddEntity(player)
+        end
+    end
+
+    Players.PlayerAdded:Connect(function(player)
+        if player == LocalPlayer then return end
+        AddEntity(player)
+        player.CharacterAdded:Connect(function()
+            UpdateElement(player)
+        end)
+    end)
+
+    Players.PlayerRemoving:Connect(function(player)
+        RemoveEntity(player)
+    end)
+
+    local function RefreshAllElements()
+        for player, entity in pairs(GlobalState.Esp.Entities) do
+            UpdateElement(player)
+        end
+    end
+
+    Toggles["Esp/Box"]:OnChanged(RefreshAllElements)
+    Toggles["Esp/BoxFill"]:OnChanged(RefreshAllElements)
+    Toggles["Esp/Name"]:OnChanged(RefreshAllElements)
+    Toggles["Esp/Distance"]:OnChanged(RefreshAllElements)
+    Toggles["Esp/HealthBar"]:OnChanged(RefreshAllElements)
+    Toggles["Esp/HealthBarNumber"]:OnChanged(RefreshAllElements)
+    Toggles["Esp/FadeOnDistance"]:OnChanged(RefreshAllElements)
+    Toggles["Esp/Enabled"]:OnChanged(RefreshAllElements)
+
+    Options["Esp/BoxColor1"]:OnChanged(RefreshAllElements)
+    Options["Esp/BoxColor2"]:OnChanged(RefreshAllElements)
+    Options["Esp/BoxFillColor1"]:OnChanged(RefreshAllElements)
+    Options["Esp/BoxFillColor2"]:OnChanged(RefreshAllElements)
+    Options["Esp/NameColor"]:OnChanged(RefreshAllElements)
+    Options["Esp/DistanceColor"]:OnChanged(RefreshAllElements)
+    Options["Esp/HealthBarColor1"]:OnChanged(RefreshAllElements)
+    Options["Esp/HealthBarColor2"]:OnChanged(RefreshAllElements)
+    Options["Esp/HealthBarNumberColor"]:OnChanged(RefreshAllElements)
+    Options["Esp/HealthBarThickness"]:OnChanged(RefreshAllElements)
+    Options["Esp/TextCases"]:OnChanged(RefreshAllElements)
+    Options["Esp/TextWrapper"]:OnChanged(RefreshAllElements)
+
+    RunService.RenderStepped:Connect(function()
+        for player, entity in pairs(GlobalState.Esp.Entities) do
+            if player and entity and entity.Render then
+                entity.Render()
+            end
+        end
+        Visuals()
+    end)
+
+    local MiscLeft = Tabs.Misc:AddLeftGroupbox("Items")
+
+    local InfItemsConnection = nil
+
+    MiscLeft:AddToggle("Misc/InfItems", { Text = "Infinity Items", Default = false, Tooltip = "The function very quickly drops all items and picks them up again\nФункция очень быстро выбрасывает все предметы и подбирает заново" })
+        :AddKeyPicker("Misc/InfItemsBind", { Default = "None", SyncToggleState = true, Mode = "Toggle", Text = "Infinity Items", NoUI = false })
+
+    Toggles["Misc/InfItems"]:OnChanged(function(value)
+        if value then
+            if InfItemsConnection then InfItemsConnection:Disconnect() end
+            InfItemsConnection = game:GetService("UserInputService").InputBegan:Connect(function(key, gameProcessed)
+                if gameProcessed then return end
+                if key.KeyCode == Enum.KeyCode.E then
+                    local character = LocalPlayer.Character
+                    local backpack = LocalPlayer.Backpack
+                    if character and backpack then
+                        for _, tool in pairs(backpack:GetChildren()) do
+                            if tool:IsA("Tool") then tool.Parent = character end
+                        end
+                        task.wait(0.03)
+                        for _, tool in pairs(character:GetChildren()) do
+                            if tool:IsA("Tool") then tool.Parent = backpack end
+                        end
+                    end
+                end
+            end)
+        else
+            if InfItemsConnection then
+                InfItemsConnection:Disconnect()
+                InfItemsConnection = nil
+            end
+        end
+    end)
+
+    local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
+
+    local SoundsGroup = Tabs.Misc:AddLeftGroupbox("Sounds")
+
+    local SoundsList = {
+        "AR2 Head", "AR2 Body", "AR2 Limb", "BB HitM", "BB Kill", "PD Head", "PD Body",
+        "Neverlose", "Gamesense", "Baimware", "Steve", "Skeet", "Body", "Ding", "Mario",
+        "Mario 2", "Minecraft", "Among Us", "Button", "Oof", "Osu", "Osu Combobreak",
+        "Bambi", "Click", "Snow", "Stone", "Rust", "Splat", "Bell", "Slime", "Saber",
+        "Bat", "Bubble", "Pick", "Pop", "EmptyGun", "Bamboo", "Stomp", "Bag", "HitMarker",
+        "LaserSlash", "RailGunF", "Bruh", "Crit", "Bonk", "Clink", "CoD", "Lazer Beam",
+        "Windows XP Error", "Windows XP Ding", "HL Med Kit", "HL Door", "HL Crowbar",
+        "HL Revolver", "HL Elevator", "TF2 HitSound", "TF2 Squasher", "TF2 Retro",
+        "TF2 Space", "TF2 Vortex", "TF2 Beepo", "TF2 Bat", "TF2 Pow", "TF2 You Suck",
+        "Quake Hitsound", "Fart", "Fart2", "FortniteGuns", "Crickets", "ScreamingKid",
+        "BitchBot", "BitchBot Head", "BitchBot Body", "Minecraft Experience", "BameWare",
+        "Fatality", "Fatality MKX", "Fatality Original", "Doublekill 1", "Doublekill 2",
+        "Killing Spree 1", "Killing Spree 2", "Sit Dog", "1 sit nn dog", "Csgo", "Bop",
+        "Grenade Hit", "KillTrocity", "Double Kill", "Triple kill", "Over Kill",
+        "Kill Tacular", "Kill Imanjaro", "Kill Tastrophe", "Kill Pocalypse", "Kill Ionaire",
+        "Killing Spree", "Killing Frenzy", "Carrier Kill", "Clutch Kill", "Taco Bell",
+        "Kombat", "Headshot", "Elevator",
+    }
+
+    local SoundsMap = {
+        ["AR2 Head"] = "2062016772", ["AR2 Body"] = "2062015952", ["AR2 Limb"] = "6659353525",
+        ["BB HitM"] = "4645745735", ["BB Kill"] = "2636743632", ["PD Head"] = "4585351098",
+        ["PD Body"] = "4585364605", ["Neverlose"] = "8726881116", ["Gamesense"] = "4817809188",
+        ["Baimware"] = "3124331820", ["Steve"] = "4965083997", ["Skeet"] = "4753603610",
+        ["Body"] = "3213738472", ["Ding"] = "7149516994", ["Mario"] = "2815207981",
+        ["Mario 2"] = "5709456554", ["Minecraft"] = "6361963422", ["Among Us"] = "5700183626",
+        ["Button"] = "12221967", ["Oof"] = "4792539171", ["Osu"] = "7149919358",
+        ["Osu Combobreak"] = "3547118594", ["Bambi"] = "8437203821", ["Click"] = "8053704437",
+        ["Snow"] = "6455527632", ["Stone"] = "3581383408", ["Rust"] = "1255040462",
+        ["Splat"] = "12222152", ["Bell"] = "6534947240", ["Slime"] = "6916371803",
+        ["Saber"] = "8415678813", ["Bat"] = "3333907347", ["Bubble"] = "6534947588",
+        ["Pick"] = "1347140027", ["Pop"] = "198598793", ["EmptyGun"] = "203691822",
+        ["Bamboo"] = "3769434519", ["Stomp"] = "200632875", ["Bag"] = "364942410",
+        ["HitMarker"] = "8543972310", ["LaserSlash"] = "199145497", ["RailGunF"] = "199145534",
+        ["Bruh"] = "4275842574", ["Crit"] = "296102734", ["Bonk"] = "3765689841",
+        ["Clink"] = "711751971", ["CoD"] = "160432334", ["Lazer Beam"] = "130791043",
+        ["Windows XP Error"] = "160715357", ["Windows XP Ding"] = "489390072",
+        ["HL Med Kit"] = "4720445506", ["HL Door"] = "4996094887", ["HL Crowbar"] = "546410481",
+        ["HL Revolver"] = "1678424590", ["HL Elevator"] = "237877850",
+        ["TF2 HitSound"] = "3455144981", ["TF2 Squasher"] = "3466981613", ["TF2 Retro"] = "3466984142",
+        ["TF2 Space"] = "3466982899", ["TF2 Vortex"] = "3466980212", ["TF2 Beepo"] = "3466987025",
+        ["TF2 Bat"] = "3333907347", ["TF2 Pow"] = "679798995", ["TF2 You Suck"] = "1058417264",
+        ["Quake Hitsound"] = "4868633804", ["Fart"] = "131314452", ["Fart2"] = "6367774932",
+        ["FortniteGuns"] = "3008769599", ["Crickets"] = "2101148", ["ScreamingKid"] = "5980352978",
+        ["BitchBot"] = "5709456554", ["BitchBot Head"] = "5043539486", ["BitchBot Body"] = "3744371342",
+        ["Minecraft Experience"] = "1053296915", ["BameWare"] = "7898991882",
+        ["Fatality"] = "7347423703", ["Fatality MKX"] = "6721975770", ["Fatality Original"] = "158012252",
+        ["Doublekill 1"] = "1950547222", ["Doublekill 2"] = "130819307",
+        ["Killing Spree 1"] = "723054723", ["Killing Spree 2"] = "937898383",
+        ["Sit Dog"] = "7349055654", ["1 sit nn dog"] = "5902468562", ["Csgo"] = "7269900245",
+        ["Bop"] = "8829676038", ["Grenade Hit"] = "5684745272", ["KillTrocity"] = "6818544945",
+        ["Double Kill"] = "6818527307", ["Triple kill"] = "6818526855", ["Over Kill"] = "6818526995",
+        ["Kill Tacular"] = "6818527070", ["Kill Imanjaro"] = "6818527258",
+        ["Kill Tastrophe"] = "6818526916", ["Kill Pocalypse"] = "6818527144",
+        ["Kill Ionaire"] = "6818527200", ["Killing Spree"] = "6822465178",
+        ["Killing Frenzy"] = "6822465319", ["Carrier Kill"] = "7139067012",
+        ["Clutch Kill"] = "7379106527", ["Taco Bell"] = "5689199277",
+        ["Kombat"] = "8527433497", ["Headshot"] = "8418469749", ["Elevator"] = "8322227967",
+    }
+
+    local function PlaySound(soundName, volume)
+        local id = SoundsMap[soundName]
+        if not id then return end
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxassetid://" .. id
+        sound.Volume = volume or 1
+        sound.Parent = workspace
+        sound:Play()
+        game:GetService("Debris"):AddItem(sound, 5)
+    end
+
+    SoundsGroup:AddToggle("Sounds/HitsoundEnabled", { Text = "Hitsound", Default = false })
+    SoundsGroup:AddDropdown("Sounds/HitsoundSound", { Values = SoundsList, Default = "Ding", Text = "Hitsound Sound" })
+    SoundsGroup:AddSlider("Sounds/HitsoundVolume", { Text = "Hitsound Volume", Default = 0.5, Min = 0, Max = 1, Rounding = 2 })
+
+    SoundsGroup:AddToggle("Sounds/KillsoundEnabled", { Text = "Killsound", Default = false })
+    SoundsGroup:AddDropdown("Sounds/KillsoundSound", { Values = SoundsList, Default = "Ding", Text = "Killsound Sound" })
+    SoundsGroup:AddSlider("Sounds/KillsoundVolume", { Text = "Killsound Volume", Default = 0.5, Min = 0, Max = 1, Rounding = 2 })
+
+    local playerNamesCache = {}
+    local function RefreshPlayerNames()
+        playerNamesCache = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                playerNamesCache[p.Name] = true
+            end
+        end
+    end
+    Players.PlayerAdded:Connect(RefreshPlayerNames)
+    Players.PlayerRemoving:Connect(RefreshPlayerNames)
+    RefreshPlayerNames()
+
+    task.spawn(function()
+        local alerts = workspace:WaitForChild(LocalPlayer.Name, 10)
+        if not alerts then return end
+        alerts = alerts:WaitForChild("@Alerts", 10)
+        if not alerts then return end
+
+        alerts.ChildAdded:Connect(function(child)
+            if not Toggles["Sounds/HitsoundEnabled"].Value then return end
+            if child.Name:find("Shot hit") then
+                local target = child.Name:match("Shot hit (.+)%.")
+                if target and playerNamesCache[target] then
+                    PlaySound(Options["Sounds/HitsoundSound"].Value, Options["Sounds/HitsoundVolume"].Value)
+                end
+            end
+        end)
+    end)
+
+    task.spawn(function()
+        local stats = workspace:WaitForChild("GameState", 10)
+        if not stats then return end
+        stats = stats:WaitForChild("Statistics", 10)
+        if not stats then return end
+        local playerStats = stats:WaitForChild(LocalPlayer.Name, 10)
+        if not playerStats then return end
+        local killsVal = playerStats:WaitForChild("Players Killed", 10)
+        if not killsVal then return end
+
+        killsVal:GetPropertyChangedSignal("Value"):Connect(function()
+            if not Toggles["Sounds/KillsoundEnabled"].Value then return end
+            PlaySound(Options["Sounds/KillsoundSound"].Value, Options["Sounds/KillsoundVolume"].Value)
+        end)
+    end)
+
+    local MiscOther = Tabs.Misc:AddRightGroupbox("Other")
+
+    MiscOther:AddButton("Remove Trees", function()
+        local removed = 0
+
+        local map = workspace:FindFirstChild("Map")
+        if map then
+            local ignore = map:FindFirstChild("Ignore")
+            if ignore then
+                local paths = { "NoCollideTrees", "CollideTrees" }
+                for _, name in ipairs(paths) do
+                    local folder = ignore:FindFirstChild(name)
+                    if folder then
+                        folder:Destroy()
+                        removed = removed + 1
+                    end
+                end
+
+                local veg = ignore:FindFirstChild("Vegetation")
+                if veg then
+                    for _, obj in ipairs(veg:GetChildren()) do
+                        if obj.Name:find("^Tree") then
+                            obj:Destroy()
+                            removed = removed + 1
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    MiscOther:AddButton("Remove Glass", function()
+        local removed = 0
+
+        local threats = workspace:FindFirstChild("Threats")
+        if threats then
+            for _, obj in ipairs(threats:GetChildren()) do
+                if obj.Name == "glass" or obj.Name:match("^glass%[%d+%]$") then
+                    obj:Destroy()
+                    removed = removed + 1
+                end
+            end
+        end
+    end)
+
+    _G.mapload = false
+
+    local MAP_COORDS = {
+        CFrame.new(-839.084045, 47.1143761, 984.461975, -0.783970058, 1.80751734e-08, 0.620798647, -1.4765126e-08, 1, -4.77620077e-08, -0.620798647, -4.6610154e-08, -0.783970058),
+        CFrame.new(-803.584045, 7.21194887, 308.355896, 0.982403815, 1.58479736e-08, -0.186769202, -6.30553554e-10, 1, 8.15365411e-08, 0.186769202, -7.99840407e-08, 0.982403815),
+        CFrame.new(-1526.72339, 112.214409, -231.00946, -0.887610257, 8.03306079e-08, 0.46059528, 9.38687421e-08, 1, 6.48780274e-09, -0.46059528, 4.89941385e-08, -0.887610257),
+        CFrame.new(-1904.23169, -0.519130886, 312.161224, 0.0343856253, -4.72146944e-09, 0.999408662, -5.24067119e-08, 1, 6.52736709e-09, -0.999408662, -5.26001678e-08, 0.0343856253),
+        CFrame.new(-1604.0824, -5.04861164, 942.651367, 0.0197974443, 1.14289016e-07, -0.99980402, 5.88034901e-08, 1, 1.15475807e-07, 0.99980402, -6.10780901e-08, 0.0197974443),
+        CFrame.new(-1707.1123, 179.226486, -571.526367, 0.62055856, -7.48812212e-09, 0.784160078, 3.17581308e-11, 1, 9.5240944e-09, -0.784160078, -5.88535487e-09, 0.62055856),
+        CFrame.new(-1822.15845, 196.469742, -1087.72717, -0.0636588559, 4.60709622e-08, 0.997971714, 1.5102658e-09, 1, -4.60682585e-08, -0.997971714, -1.42545009e-09, -0.0636588559),
+        CFrame.new(-1428.3042, 230.342346, -934.078064, -0.406229645, 4.99592261e-08, -0.913771033, -3.6013649e-08, 1, 7.06840524e-08, 0.913771033, 6.16221882e-08, -0.406229645),
+        CFrame.new(-1016.04315, 60.2649536, -563.828918, -0.509122312, -8.42375272e-08, -0.86069417, 3.48745144e-09, 1, -9.99345318e-08, 0.86069417, -5.38805267e-08, -0.509122312),
+        CFrame.new(-594.057739, -8.1450243, -287.38028, -0.740881205, -5.92404774e-08, -0.671636105, -9.24110388e-09, 1, -7.80093785e-08, 0.671636105, -5.15890228e-08, -0.740881205),
+        CFrame.new(-73.5366516, 41.020813, 151.011719, -0.974377215, -2.30598296e-08, 0.224920094, -6.09587225e-09, 1, 7.6116585e-08, -0.224920094, 7.27951814e-08, -0.974377215),
+        CFrame.new(114.257034, -8.2293272, 961.810852, 0.233019039, 1.63432219e-08, 0.972472191, 1.46854595e-09, 1, -1.71577366e-08, -0.972472191, 5.42619949e-09, 0.233019039),
+        CFrame.new(341.831482, 62.4593658, -675.366394, 0.683162153, -1.95949017e-08, -0.73026669, -2.07864237e-09, 1, -2.87770909e-08, 0.73026669, 2.11773834e-08, 0.683162153),
+        CFrame.new(549.475708, 124.226051, -1271.82935, 0.905293822, 2.51256207e-08, -0.424785972, -1.12577609e-08, 1, 3.51566207e-08, 0.424785972, -2.70449316e-08, 0.905293822),
+        CFrame.new(10.9517717, 61.2963181, -1483.2749, 0.0124161374, -6.73310652e-08, 0.999922931, -4.55573428e-08, 1, 6.79019436e-08, -0.999922931, -4.6396913e-08, 0.0124161374),
+        CFrame.new(-350.45343, 186.983551, -1666.01538, 0.0981061012, 7.9673967e-08, 0.995175958, -1.0420527e-07, 1, -6.97874469e-08, -0.995175958, -9.68560059e-08, 0.0981061012),
+        CFrame.new(-635.110046, 316.835114, -1311.79053, -0.96802932, -2.60349129e-08, 0.250837088, -5.08676268e-10, 1, 1.01829038e-07, -0.250837088, 9.84459021e-08, -0.96802932),
+        CFrame.new(-1223.76306, 347.567444, -1183.38245, 0.999236405, -5.02843589e-09, -0.039072033, 3.53000451e-09, 1, -3.84194792e-08, 0.039072033, 3.82522174e-08, 0.999236405),
+        CFrame.new(-727.868713, 197.170868, -2122.08081, 0.459603816, -4.62207694e-08, -0.888124049, -1.13414356e-09, 1, -5.26300639e-08, 0.888124049, 2.5196238e-08, 0.459603816),
+        CFrame.new(-318.809296, -6.50623322, -2569.38208, -0.561707079, -2.88308346e-08, -0.827336192, 3.65959245e-08, 1, -5.96940239e-08, 0.827336192, -6.38076898e-08, -0.561707079),
+        CFrame.new(-38.7062492, 341.775208, -2839.13574, -0.986212134, -5.07027451e-08, -0.165486172, -3.96245383e-08, 1, -7.02448162e-08, 0.165486172, -6.27189749e-08, -0.986212134),
+        CFrame.new(656.686829, -0.608118474, -2474.65381, 0.958230078, 1.82756086e-08, -0.285998493, -2.53927759e-08, 1, -2.11767297e-08, 0.285998493, 2.75544743e-08, 0.958230078),
+        CFrame.new(114.282944, -4.96636295, -1723.94775, -0.722328126, 5.51469448e-08, -0.691550434, 3.31165104e-08, 1, 4.5153552e-08, 0.691550434, 9.71394343e-09, -0.722328126),
+        CFrame.new(-708.622253, 303.265839, -3150.43115, 0.981136918, -1.42151162e-08, 0.193314001, 2.46867904e-09, 1, 6.10043926e-08, -0.193314001, -5.93764327e-08, 0.981136918),
+        CFrame.new(-1008.27484, 59.4710541, -3409.66504, 0.954330623, -3.40232731e-08, 0.298752576, 4.77642388e-08, 1, -3.86928924e-08, -0.298752576, 5.11955029e-08, 0.954330623),
+        CFrame.new(-1337.47839, 24.0073395, -2621.30664, -0.999742627, -6.96311619e-10, 0.0226853695, 4.43534126e-10, 1, 5.02408213e-08, -0.0226853695, 5.02379542e-08, -0.999742627),
+        CFrame.new(-1115.72644, 180.873383, -2067.62158, -0.304059178, 7.47341815e-08, -0.95265317, 1.53105117e-09, 1, 7.79598039e-08, 0.95265317, 2.22458318e-08, -0.304059178),
+        CFrame.new(-1496.54663, 206.588791, -1680.27856, -0.836533368, 2.22935945e-08, -0.547915936, 4.87388476e-08, 1, -3.37242909e-08, 0.547915936, -5.49162884e-08, -0.836533368),
+        CFrame.new(-2173.91797, 11.8374681, -1269.64392, -0.352175236, 1.06021304e-07, 0.935934067, -1.83170084e-08, 1, -1.20170967e-07, -0.935934067, -5.94647496e-08, -0.352175236),
+    }
+
+    local mapLoadRunning = false
+
+    MiscOther:AddButton("Load Map", function()
+        if mapLoadRunning then
+            Library:Notify({ Title = "Load Map", Description = "Wait", Time = 2 })
+            return
+        end
+
+        mapLoadRunning = true
+        _G.mapload = false
+
+        task.spawn(function()
+            local savedCFrame
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                savedCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
+            end
+
+            for i, cf in ipairs(MAP_COORDS) do
+                local char = LocalPlayer.Character
+                if not char then break end
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if not hrp then break end
+
+                hrp.CFrame = cf
+                task.wait(3)
+            end
+
+            if savedCFrame and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = savedCFrame
+            end
+
+            _G.mapload = true
+            mapLoadRunning = false
+            Library:Notify({ Title = "Map Load", Description = "Map Loading Successful", Time = 3 })
+        end)
+    end)
+
+    MiscOther:AddButton("Pick Up All Collectibles", function()
+        if not _G.mapload then
+            Library:Notify({
+                Title = "Collectibles",
+                Description = "Map not loaded",
+                Time = 3,
+            })
+            return
+        end
+
+        local char = LocalPlayer.Character
+        if not char then
+            Library:Notify({ Title = "Collectibles", Description = "No character", Time = 2 })
+            return
+        end
+
+        local holder = workspace:FindFirstChild(LocalPlayer.Name)
+        local tank = holder and holder:FindFirstChild("OxygenTank")
+
+        if not tank then
+            Library:Notify({
+                Title = "Collectibles",
+                Description = "Put on your diving gear first",
+                Time = 3,
+            })
+            return
+        end
+
+        local oxygenVal = tank:FindFirstChild("Oxygen")
+        if not oxygenVal then
+            return
+        end
+
+        if oxygenVal.Value < 150 then
+            Library:Notify({
+                Title = "Collectibles",
+                Description = string.format("Not enough oxygen, need 150, have %d.", oxygenVal.Value),
+                Time = 3,
+            })
+            return
+        end
+
+        local folder = workspace.Map.Ignore:FindFirstChild("Collectibles")
+        if not folder then
+            Library:Notify({ Title = "Collectibles", Description = "Collectibles folder not found", Time = 3 })
+            return
+        end
+
+        task.spawn(function()
+            local prevNoclip = Toggles["mov_noclip"].Value
+            local prevFly = Toggles["mov_fly"].Value
+
+            Toggles["mov_noclip"]:SetValue(true)
+            Toggles["mov_fly"]:SetValue(true)
+
+            local char = LocalPlayer.Character
+            local savedCFrame
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then savedCFrame = hrp.CFrame end
+
+            local collected = 0
+            local total = 0
+
+            for _, obj in ipairs(folder:GetChildren()) do
+                if obj:FindFirstChildWhichIsA("ClickDetector", true) then
+                    total = total + 1
+                end
+            end
+
+            for _, obj in ipairs(folder:GetChildren()) do
+                local cd = obj:FindFirstChildWhichIsA("ClickDetector", true)
+                if cd then
+                    local part
+                    if obj:IsA("Model") then
+                        part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                    elseif obj:IsA("BasePart") then
+                        part = obj
+                    end
+                    if not part and cd.Parent and cd.Parent:IsA("BasePart") then
+                        part = cd.Parent
+                    end
+
+                    if part then
+                        local curChar = LocalPlayer.Character
+                        local curHrp = curChar and curChar:FindFirstChild("HumanoidRootPart")
+
+                        if curHrp then
+                            curHrp.CFrame = part.CFrame - Vector3.new(0, 10, 0)
+
+                            task.wait(1.5)
+
+                            pcall(function()
+                                fireclickdetector(cd)
+                            end)
+
+                            collected = collected + 1
+                            print("[Auto-Collect]", obj.Name, collected .. "/" .. total)
+
+                            task.wait(1)
+                        end
+                    end
+                end
+            end
+
+            local curChar = LocalPlayer.Character
+            local curHrp = curChar and curChar:FindFirstChild("HumanoidRootPart")
+            if savedCFrame and curHrp then
+                curHrp.CFrame = savedCFrame
+            end
+
+            Toggles["mov_noclip"]:SetValue(prevNoclip)
+            Toggles["mov_fly"]:SetValue(prevFly)
+
+            Library:Notify({
+                Title = "Collectibles",
+                Description = string.format("Done, collected %d/%d.", collected, total),
+                Time = 3,
+            })
+        end)
+    end)
+
+    local solveEnv = setmetatable({}, {
+        __index = function(_, k)
+            local f = math[k]
+            if f then return f end
+            error("unknown: " .. tostring(k))
+        end
+    })
+
+    local function parseArgs(...)
+        local args = { ... }
+        if #args < 3 then return nil end
+
+        local formulas = args[1]
+        local varNames = args[2]
+        local targets = args[3]
+        local knownVars = args[4] or {}
+        return formulas, varNames, targets, knownVars
+    end
+
+    local function solveSystem(formulas, varNames, targets, knownVars)
+        local allVars = {}
+        for _, n in ipairs(varNames) do allVars[n] = true end
+        for k in pairs(knownVars) do allVars[k] = true end
+        for _, f in ipairs(formulas) do
+            for letter in f:gmatch("%u") do allVars[letter] = true end
+        end
+
+        local unknown = {}
+        for name in pairs(allVars) do
+            if knownVars[name] == nil then
+                table.insert(unknown, name)
+            end
+        end
+        table.sort(unknown)
+
+        if #unknown == 0 then
+            local result = {}
+            for _, n in ipairs(varNames) do
+                table.insert(result, knownVars[n])
+            end
+            return result
+        end
+
+        local MIN, MAX
+        if #unknown <= 1 then
+            MIN, MAX = 0, 10000
+        elseif #unknown == 2 then
+            MIN, MAX = 0, 500
+        elseif #unknown == 3 then
+            MIN, MAX = 0, 50
+        else
+            MIN, MAX = 0, 20
+        end
+
+        local maxAttempts = 10_000_000
+        local attempts = 0
+
+        local allParams = {}
+        for n in pairs(allVars) do table.insert(allParams, n) end
+        table.sort(allParams)
+
+        local fnParams = table.concat(allParams, ", ")
+
+        local body = "local _out = {}\n"
+        for i, f in ipairs(formulas) do
+            body = body .. "local _r" .. i .. " = (" .. f .. ")\n"
+        end
+        local retList = {}
+        for i = 1, #formulas do table.insert(retList, "_r" .. i) end
+        body = body .. "return {" .. table.concat(retList, ",") .. "}\n"
+
+        local src = "local function _solveFn(" .. fnParams .. ")\n" .. body .. "end\nreturn _solveFn"
+
+        local loader = loadstring(src)
+        if not loader then
+            warn("[Auto-Crate] loadstring failed")
+            warn("[Auto-Crate] src:\n" .. src)
+            return nil
+        end
+
+        local okLoad, checkFn = pcall(loader)
+        if not okLoad or type(checkFn) ~= "function" then
+            warn("[Auto-Crate] loader() failed:", checkFn)
+            return nil
+        end
+
+        local solution = {}
+        local function brute(idx)
+            attempts = attempts + 1
+            if attempts > maxAttempts then return false end
+
+            if idx > #unknown then
+                local args = {}
+                for _, n in ipairs(allParams) do
+                    if solution[n] ~= nil then
+                        table.insert(args, solution[n])
+                    else
+                        table.insert(args, knownVars[n])
+                    end
+                end
+
+                local ok, results = pcall(checkFn, table.unpack(args))
+                if ok and type(results) == "table" then
+                    for i, target in ipairs(targets) do
+                        if math.abs((results[i] or 0) - target) > 0.001 then
+                            return false
+                        end
+                    end
+                    return true
+                end
+                return false
+            end
+
+            local name = unknown[idx]
+            for val = MIN, MAX do
+                solution[name] = val
+                if brute(idx + 1) then return true end
+            end
+            solution[name] = nil
+            return false
+        end
+
+        if not brute(1) then
+            warn("[Auto-Crate] no solution. attempts:", attempts, "unknown:", table.concat(unknown, ","))
+            return nil
+        end
+
+        local result = {}
+        for _, n in ipairs(varNames) do
+            if solution[n] ~= nil then
+                table.insert(result, solution[n])
+            elseif knownVars[n] ~= nil then
+                table.insert(result, knownVars[n])
+            else
+                warn("[Auto-Crate] var", n, "not resolved")
+                return nil
+            end
+        end
+        return result
+    end
+
+    local AutoCrateToggle = MiscOther:AddToggle("Misc/AutoCrate", {
+        Text = "Auto-Crate",
+        Default = false,
+    })
+        :AddKeyPicker("Misc/AutoCrateBind", { Default = "None", SyncToggleState = true, Mode = "Toggle", Text = "Auto-Crate", NoUI = false })
+
+    local crateConn
+
+    Toggles["Misc/AutoCrate"]:OnChanged(function(enabled)
+        if crateConn then crateConn:Disconnect() crateConn = nil end
+        if not enabled then return end
+
+        local holder = workspace:FindFirstChild(LocalPlayer.Name)
+        local remote = holder and holder:FindFirstChild("@H")
+        if not remote then
+            Library:Notify({ Title = "Auto-Crate", Description = "Remote @H not found in workspace" .. LocalPlayer.Name, Time = 3 })
+            return
+        end
+
+        crateConn = remote.OnClientEvent:Connect(function(...)
+            print("[Auto-Crate] RAW ARGS:", ...)
+            local args = { ... }
+            if #args < 3 then return end
+
+            local formulas = args[1]
+            local varNames = args[2]
+            local targets  = args[3]
+            local knownVars = args[4] or {}
+
+            if type(formulas) ~= "table" or type(varNames) ~= "table" or type(targets) ~= "table" then
+                return
+            end
+
+            local solution = solveSystem(formulas, varNames, targets, knownVars)
+            if not solution then
+                Library:Notify({ Title = "Auto-Crate", Description = "Failed to solve sequence", Time = 3 })
+                return
+            end
+
+            local answer = table.concat(solution, ", ")
+            pcall(function()
+                firesignal(workspace.Services.Alert.OnClientEvent, answer, Color3.fromRGB(0, 255, 0))
+            end)
+
+            local varValues = {}
+            for i, n in ipairs(varNames) do
+                varValues[n] = solution[i]
+            end
+
+            local sortedVars = {}
+            for n, _ in pairs(varValues) do
+                table.insert(sortedVars, n)
+            end
+            table.sort(sortedVars)
+
+            local lines = {}
+            for _, n in ipairs(sortedVars) do
+                table.insert(lines, n .. " = " .. tostring(varValues[n]))
+            end
+
+            local desc = answer .. "\n\n" .. table.concat(lines, "\n")
+
+            Library:Notify({
+                Title = "Auto-Crate",
+                Description = desc,
+                Time = 15,
+            })
+        end)
+    end)
+
+    local MiscRight = Tabs.Misc:AddRightGroupbox("Aimbot")
+
+    local function GetClosestPlayerToCursor()
+        local camera = workspace.CurrentCamera
+        local closestPlayer = nil
+        local closestAngle = math.huge
+        local offscreenPlayers = {}
+
+        for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+            if player == LocalPlayer then continue end
+            local character = player.Character
+            if not character then continue end
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if not humanoid or humanoid.Health <= 0 then continue end
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if not rootPart then continue end
+
+            local screenPos, onScreen = camera:WorldToViewportPoint(rootPart.Position)
+            if onScreen then
+                local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+                local angle = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                if angle < closestAngle then
+                    closestAngle = angle
+                    closestPlayer = player
+                end
+            else
+                table.insert(offscreenPlayers, player)
+            end
+        end
+
+        if closestPlayer then
+            return closestPlayer
+        elseif #offscreenPlayers > 0 then
+            return offscreenPlayers[math.random(1, #offscreenPlayers)]
+        end
+
+        return nil
+    end
+
+    local function FireAimbot()
+        local target = GetClosestPlayerToCursor()
+        if not target or not target.Character then return end
+
+        local character = LocalPlayer.Character
+        if not character then return end
+
+        local tool = character:FindFirstChildOfClass("Tool")
+        if not tool then return end
+
+        local remote = tool:FindFirstChild("@Kill")
+        if not remote then return end
+
+        remote:FireServer(target.Character)
+    end
+
+    MiscRight:AddLabel("AutoTap"):AddKeyPicker("Misc/AimbotBind", {
+        Default = "None",
+        Mode = "Press",
+        Text = "AutoTap",
+        NoUI = false,
+        Callback = function()
+            FireAimbot()
+        end,
+    })
+    MenuGroup:AddToggle("KeybindMenuOpen", { Default = Library.KeybindFrame.Visible, Text = "Open Keybind Menu", Callback = function(v) Library.KeybindFrame.Visible = v end })
+    MenuGroup:AddToggle("ShowCustomCursor", { Text = "Custom Cursor", Default = true, Callback = function(v) Library.ShowCustomCursor = v end })
+    MenuGroup:AddDropdown("NotificationSide", { Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side", Callback = function(v) Library:SetNotifySide(v) end })
+    MenuGroup:AddSlider("UICornerSlider", { Text = "Corner Radius", Default = Library.CornerRadius, Min = 0, Max = 20, Rounding = 0, Callback = function(v) Window:SetCornerRadius(v) end })
+    MenuGroup:AddDivider()
+    MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", { Default = "End", NoUI = true, Text = "Menu keybind" })
+    MenuGroup:AddButton("Unload", function() Library:Unload() end)
+
+    Library.ToggleKeybind = Options.MenuKeybind
+
+    ThemeManager:SetLibrary(Library)
+    SaveManager:SetLibrary(Library)
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+    ThemeManager:SetFolder("Enderphobia")
+    SaveManager:SetFolder("Enderphobia/menu")
+    SaveManager:BuildConfigSection(Tabs["UI Settings"])
+    ThemeManager:ApplyToTab(Tabs["UI Settings"])
+    SaveManager:LoadAutoloadConfig()
+end
+
+local KeyWindow = Library:CreateWindow({
+    Title = "Enderphobia",
+    Footer = "t.me/Enderphobia1337",
+    Icon = 112012071630242,
+    NotifySide = "Right",
+    ShowCustomCursor = true,
+})
+
+local KeyTab = KeyWindow:AddKeyTab("Key System", "key")
+
+local unlocked = false
+
+KeyTab:AddLabel({
+	Text = "Key in Telegram: @enderphobia1337",
+	DoesWrap = true,
+	Size = 16,
+})
+KeyTab:AddKeyBox(function(ReceivedKey)
+    if unlocked then return end
+
+    if ReceivedKey == "TG_ENDERPHOBIA1337" then
+        unlocked = true
+        Library:Notify({
+            Title = "Yep",
+            Description = "Loading..",
+            Time = 3,
+        })
+
+        Library:Unload()
+
+        task.wait(0.2)
+        BuildMainUI()
+    else
+        Library:Notify({
+            Title = "Error",
+            Description = "Wrong key",
+            Time = 3,
+        })
+    end
+end)
