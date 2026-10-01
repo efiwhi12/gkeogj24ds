@@ -304,11 +304,11 @@ do
 	end
 
 	LoadedFonts = {
-		Tahoma = LoadFont("tahoma", game:HttpGet("https://github.com/mental1illness/storage/raw/refs/heads/main/fonts/old-tahoma.ttf")),
-		TahomaBold = LoadFont("tahomabold", game:HttpGet("https://github.com/mental1illness/storage/raw/refs/heads/main/fonts/old-tahoma-bold.ttf")),
-		SmallestPixel7 = LoadFont("smallestpixel7", game:HttpGet("https://github.com/mental1illness/storage/raw/refs/heads/main/fonts/smallest_pixel-7.ttf")),
-		ProggyClean = LoadFont("proggyclean", game:HttpGet("https://github.com/mental1illness/storage/raw/refs/heads/main/fonts/proggyclean.ttf")),
-		Minecraftia = LoadFont("minecraftia", game:HttpGet("https://github.com/mental1illness/storage/raw/refs/heads/main/fonts/Minecraftia-Regular.ttf")),
+		Tahoma = LoadFont("tahoma", game:HttpGet("https://raw.githubusercontent.com/mental1illness/storage/refs/heads/main/fonts/old-tahoma.ttf")),
+		TahomaBold = LoadFont("tahomabold", game:HttpGet("https://raw.githubusercontent.com/mental1illness/storage/refs/heads/main/fonts/old-tahoma-bold.ttf")),
+		SmallestPixel7 = LoadFont("smallestpixel-7", game:HttpGet("https://raw.githubusercontent.com/mental1illness/storage/refs/heads/main/fonts/smallest_pixel-7.ttf")),
+		ProggyClean = LoadFont("proggyclean", game:HttpGet("https://raw.githubusercontent.com/mental1illness/storage/refs/heads/main/fonts/proggyclean.ttf")),
+		Minecraftia = LoadFont("minecraftia", game:HttpGet("https://raw.githubusercontent.com/mental1illness/storage/refs/heads/main/fonts/Minecraftia-Regular.ttf")),
 	}
 end
 
