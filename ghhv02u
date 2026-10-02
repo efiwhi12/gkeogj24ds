@@ -96,7 +96,6 @@ local function BuildMainUI()
     })
 
     local Tabs = {
-        Info = Window:AddTab("Info", "info"),
         Main = Window:AddTab("Esp", "user"),
         Teleports = Window:AddTab("Teleports", "diamond"),
         Movement = Window:AddTab("Movement", "activity"),
@@ -104,33 +103,6 @@ local function BuildMainUI()
         World = Window:AddTab("World", "globe"),
         ["UI Settings"] = Window:AddTab("Settings", "settings"),
     }
-
-    local InfoLeft = Tabs.Info:AddLeftGroupbox("User")
-    local InfoLeft2 = Tabs.Info:AddLeftGroupbox("Community")
-    local InfoRight = Tabs.Info:AddRightGroupbox("Change Logs")
-    local InfoRight2 = Tabs.Info:AddRightGroupbox("Executor")
-
-    InfoLeft:AddLabel("Username: " .. LocalPlayer.Name)
-    InfoLeft:AddLabel("User ID: " .. tostring(LocalPlayer.UserId))
-    InfoLeft:AddLabel("Total Executions: " .. tostring(UserData.TotalExecutions))
-
-    InfoLeft2:AddLabel("Want to buy a key?")
-    InfoLeft2:AddLabel("Use Telegram or Funpay")
-    InfoLeft2:AddButton("Copy Funpay Link", function()
-        local ok = pcall(function()
-            setclipboard("https://funpay.com/users/21637949/")
-        end)
-    end)
-    InfoLeft2:AddButton("Copy Telegram Link (chat)", function()
-        local ok = pcall(function()
-            setclipboard("https://t.me/+66c2vLw1bgo2ZWRi")
-        end)
-    end)
-
-    InfoRight:AddLabel("Nothing..")
-
-    InfoRight2:AddLabel("Executor: " .. ExecutorName)
-    InfoRight2:AddLabel("Version: " .. ExecutorVersion)
 
     local EspTab = Tabs.Main
     local LeftGroup = EspTab:AddLeftGroupbox("Players")
@@ -154,7 +126,6 @@ local function BuildMainUI()
     MovementR:AddToggle('mov_noclip', { Text = 'Noclip', Default = false })
         :AddKeyPicker('mov_noclipBind', { Default = 'None', SyncToggleState = true, Mode = 'Toggle', Text = 'Noclip', NoUI = false })
 
-    -- Fly
     local flyBV, flyBG, flyConn
     local UIS = game:GetService('UserInputService')
 
@@ -203,7 +174,6 @@ local function BuildMainUI()
         end
     end)
 
-    -- Noclip
     local noclipConn
     Toggles['mov_noclip']:OnChanged(function(v)
         if v then
@@ -294,9 +264,9 @@ local function BuildMainUI()
     WorldFog:AddColorPicker("World/FogColor", { Default = Color3.fromRGB(199,199,199), Title = "Fog Color" })
     WorldFog:AddColorPicker("World/FogDecay", { Default = Color3.fromRGB(199,199,199), Title = "Fog Decay" })
     WorldLeft:AddSlider("World/FogDensity", { Text = "Fog Density", Default = 0, Min = 0, Max = 1, Rounding = 2 })
-    WorldLeft:AddSlider("World/FogOffset",  { Text = "Fog Offset",  Default = 0, Min = 0, Max = 1, Rounding = 2 })
-    WorldLeft:AddSlider("World/FogHaze",    { Text = "Fog Haze",    Default = 0, Min = 0, Max = 1, Rounding = 2 })
-    WorldLeft:AddSlider("World/FogGlare",   { Text = "Fog Glare",   Default = 0, Min = 0, Max = 1, Rounding = 2 })
+    WorldLeft:AddSlider("World/FogOffset", { Text = "Fog Offset",  Default = 0, Min = 0, Max = 1, Rounding = 2 })
+    WorldLeft:AddSlider("World/FogHaze", { Text = "Fog Haze",    Default = 0, Min = 0, Max = 1, Rounding = 2 })
+    WorldLeft:AddSlider("World/FogGlare", { Text = "Fog Glare",   Default = 0, Min = 0, Max = 1, Rounding = 2 })
 
     WorldRight:AddToggle("World/SkyboxEnabled", { Text = "Skybox", Default = false })
     WorldRight:AddDropdown("World/SkyboxType", {
@@ -306,13 +276,13 @@ local function BuildMainUI()
 
     WorldRight:AddToggle("World/Bloom", { Text = "Bloom Effect", Default = false })
     WorldRight:AddSlider("World/BloomIntensity", { Text = "Bloom Intensity", Default = 0.5, Min = 0, Max = 2,   Rounding = 2 })
-    WorldRight:AddSlider("World/BloomSize",      { Text = "Bloom Size",      Default = 24,  Min = 1, Max = 56,  Rounding = 0 })
+    WorldRight:AddSlider("World/BloomSize", { Text = "Bloom Size", Default = 24,  Min = 1, Max = 56, Rounding = 0 })
     WorldRight:AddSlider("World/BloomThreshold", { Text = "Bloom Threshold", Default = 0.9, Min = 0, Max = 1,   Rounding = 2 })
 
     local WorldTrailTog = WorldTrail:AddToggle("World/FootTrailEnabled", { Text = "Trail", Default = false })
     WorldTrailTog:AddColorPicker("World/FootTrailColor", { Default = Color3.fromRGB(255,255,255), Title = "Trail Color" })
-    WorldTrail:AddSlider("World/FootTrailLength",   { Text = "Trail Length",   Default = 50, Min = 10, Max = 100, Rounding = 0 })
-    WorldTrail:AddSlider("World/FootTrailLifetime", { Text = "Trail Lifetime", Default = 5,  Min = 1,  Max = 10,  Rounding = 0 })
+    WorldTrail:AddSlider("World/FootTrailLength", { Text = "Trail Length", Default = 50, Min = 10, Max = 100, Rounding = 0 })
+    WorldTrail:AddSlider("World/FootTrailLifetime", { Text = "Trail Lifetime", Default = 5,  Min = 1,  Max = 10, Rounding = 0 })
 
     Toggles["World/FootTrailEnabled"]:OnChanged(function() footTrail.Enabled = Toggles["World/FootTrailEnabled"].Value end)
     Options["World/FootTrailColor"]:OnChanged(function() footTrail.Color = Options["World/FootTrailColor"].Value end)
