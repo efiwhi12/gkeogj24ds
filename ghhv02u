@@ -21,6 +21,51 @@ local LocalPlayer = Players.LocalPlayer
 local CurrentCamera = Workspace.CurrentCamera
 local UIHolder = gethui() or game:GetService("CoreGui")
 
+local function GetUserDataPath()
+    if not isfolder("enderphobia") then
+        makefolder("enderphobia")
+    end
+    return "enderphobia/userdata.json"
+end
+
+local function LoadUserData()
+    local path = GetUserDataPath()
+    if isfile(path) then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(readfile(path))
+        end)
+        if ok and type(data) == "table" then
+            return data
+        end
+    end
+    return { TotalExecutions = 0 }
+end
+
+local function SaveUserData(data)
+    local path = GetUserDataPath()
+    pcall(function()
+        writefile(path, HttpService:JSONEncode(data))
+    end)
+end
+
+local UserData = LoadUserData()
+UserData.TotalExecutions = (UserData.TotalExecutions or 0) + 1
+SaveUserData(UserData)
+
+local function GetExecutorInfo()
+    local name, version = "Unknown", "Unknown"
+    if identifyexecutor then
+        local ok, n, v = pcall(identifyexecutor)
+        if ok then
+            name = tostring(n or "Unknown")
+            version = tostring(v or "Unknown")
+        end
+    end
+    return name, version
+end
+
+local ExecutorName, ExecutorVersion = GetExecutorInfo()
+
 local function LoadFont(name, url)
     writefile(name .. ".ttf", game:HttpGet(url))
     local cfg = { Name = name, faces = { { name = "Regular", weight = 400, style = "normal", assetId = getcustomasset(name .. ".ttf") } } }
@@ -44,13 +89,14 @@ local function BuildMainUI()
 
     local Window = Library:CreateWindow({
         Title = "Enderphobia",
-        Footer = "t.me/Enderphobia1337 | t.me/Enderphobia1337 | t.me/Enderphobia1337",
+        Footer = "t.me/Enderphobia1337",
         Icon = 112012071630242,
         NotifySide = "Right",
         ShowCustomCursor = true,
     })
 
     local Tabs = {
+        Info = Window:AddTab("Info", "info"),
         Main = Window:AddTab("Esp", "user"),
         Teleports = Window:AddTab("Teleports", "diamond"),
         Movement = Window:AddTab("Movement", "activity"),
@@ -58,6 +104,33 @@ local function BuildMainUI()
         World = Window:AddTab("World", "globe"),
         ["UI Settings"] = Window:AddTab("Settings", "settings"),
     }
+
+    local InfoLeft = Tabs.Info:AddLeftGroupbox("User")
+    local InfoLeft2 = Tabs.Info:AddLeftGroupbox("Community")
+    local InfoRight = Tabs.Info:AddRightGroupbox("Change Logs")
+    local InfoRight2 = Tabs.Info:AddRightGroupbox("Executor")
+
+    InfoLeft:AddLabel("Username: " .. LocalPlayer.Name)
+    InfoLeft:AddLabel("User ID: " .. tostring(LocalPlayer.UserId))
+    InfoLeft:AddLabel("Total Executions: " .. tostring(UserData.TotalExecutions))
+
+    InfoLeft2:AddLabel("Want to buy a key?")
+    InfoLeft2:AddLabel("Use Telegram or Funpay")
+    InfoLeft2:AddButton("Copy Funpay Link", function()
+        local ok = pcall(function()
+            setclipboard("https://funpay.com/users/21637949/")
+        end)
+    end)
+    InfoLeft2:AddButton("Copy Telegram Link (chat)", function()
+        local ok = pcall(function()
+            setclipboard("https://t.me/+66c2vLw1bgo2ZWRi")
+        end)
+    end)
+
+    InfoRight:AddLabel("Nothing..")
+
+    InfoRight2:AddLabel("Executor: " .. ExecutorName)
+    InfoRight2:AddLabel("Version: " .. ExecutorVersion)
 
     local EspTab = Tabs.Main
     local LeftGroup = EspTab:AddLeftGroupbox("Players")
