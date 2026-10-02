@@ -959,8 +959,9 @@ local UISettingsTab
 local Connections = {}
 local FlagTypes = {}
 local TabIcons = {
+	Info = "info",
 	Rage = "crosshair",
-	LegitBot = "circle-plus",
+	Legit = "circle-plus",
 	Misc = "box",
 	Esp = "user",
 	Visuals = "earth",
@@ -1281,6 +1282,10 @@ local function CreateSectionMethods(groupbox)
         	Placeholder = opts.Placeholder or "",
         	Callback = opts.Callback,
     	})
+	end
+
+	function section:Label(text)
+		groupbox:AddLabel(text)
 	end
 
 	function section:Button(opts)
@@ -2381,21 +2386,113 @@ end
 
 local MainWindow = UILibrary:Window { name = "Enderphobia", Icon = 112012071630242 }
 local Tabs = {
+	[8] = { Name = "Info", Object = MainWindow:Tab { name = "Info" } },
 	[1] = { Name = "RageBot", Object = MainWindow:Tab { name = "Rage",  } },
-	[6] = { Name = "LegitBot", Object = MainWindow:Tab { name = "LegitBot" } },
+	[6] = { Name = "Legit", Object = MainWindow:Tab { name = "Legit" } },
 	[3] = { Name = "ESP", Object = MainWindow:Tab { name = "Esp" } },
 	[4] = { Name = "Visuals", Object = MainWindow:Tab { name = "Visuals" } },
 	[2] = { Name = "Misc", Object = MainWindow:Tab { name = "Misc" } },
 	[7] = { Name = "Skins", Object = MainWindow:Tab { name = "Skins" } },
 }
 local Columns = {
+	[8] = { Name = "Info", Left = Tabs[8].Object:Column(), Right = Tabs[8].Object:Column() },
 	[1] = { Name = "RageBot", Left = Tabs[1].Object:Column(), Right = Tabs[1].Object:Column() },
-	[6] = { Name = "LegitBot", Left = Tabs[6].Object:Column(), Right = Tabs[6].Object:Column() },
+	[6] = { Name = "Legit", Left = Tabs[6].Object:Column(), Right = Tabs[6].Object:Column() },
 	[3] = { Name = "ESP", Left = Tabs[3].Object:Column(), Right = Tabs[3].Object:Column() },
 	[4] = { Name = "Visuals", Left = Tabs[4].Object:Column(), Right = Tabs[4].Object:Column() },
 	[2] = { Name = "Misc", Left = Tabs[2].Object:Column(), Right = Tabs[2].Object:Column() },
 	[7] = { Name = "Skins", Left = Tabs[7].Object:Column(), Right = Tabs[7].Object:Column() },
 }
+
+local function GetUserDataPath()
+    if not isfolder("enderphobia") then
+        makefolder("enderphobia")
+    end
+    return "enderphobia/userdata.json"
+end
+
+local function LoadUserData()
+    local path = GetUserDataPath()
+    if isfile(path) then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(readfile(path))
+        end)
+        if ok and type(data) == "table" then
+            return data
+        end
+    end
+    return { TotalExecutions = 0 }
+end
+
+local function SaveUserData(data)
+    local path = GetUserDataPath()
+    pcall(function()
+        writefile(path, HttpService:JSONEncode(data))
+    end)
+end
+
+local UserData = LoadUserData()
+UserData.TotalExecutions = (UserData.TotalExecutions or 0) + 1
+SaveUserData(UserData)
+
+local function GetExecutorInfo()
+    local name, version = "Unknown", "Unknown"
+    if identifyexecutor then
+        local ok, n, v = pcall(identifyexecutor)
+        if ok then
+            if v then
+                name = tostring(n or "Unknown")
+                version = tostring(v)
+            elseif n then
+                local s = tostring(n)
+                local parsedName, parsedVer = s:match("^([^%s]+)%s+v?(.+)$")
+                if parsedName then
+                    name = parsedName
+                    version = parsedVer
+                else
+                    name = s
+                end
+            end
+        end
+    end
+    return name, version
+end
+
+local ExecutorName, ExecutorVersion = GetExecutorInfo()
+
+do
+    local InfoColumn = Columns[8]
+    local LeftInfo = InfoColumn.Left
+    local RightInfo = InfoColumn.Right
+
+    local UserSection = LeftInfo:Section { Name = "User" }
+    UserSection:Label("Username: " .. LocalPlayer.Name)
+    UserSection:Label("User ID: " .. tostring(LocalPlayer.UserId))
+    UserSection:Label("Total Executions: " .. tostring(UserData.TotalExecutions))
+
+    local CommunitySection = LeftInfo:Section { Name = "Community" }
+    CommunitySection:Label("Want to buy a key?")
+    CommunitySection:Label("Use Telegram or Funpay")
+	CommunitySection:Button { Name = "Copy Funpay Link", Callback = function()
+        local ok = pcall(function()
+            setclipboard("https://funpay.com/users/21637949/")
+        end)
+    end }
+    CommunitySection:Button { Name = "Copy Telegram Link (chat)", Callback = function()
+        local ok = pcall(function()
+            setclipboard("https://t.me/+66c2vLw1bgo2ZWRi")
+        end)
+    end }
+
+    local LogsSection = RightInfo:Section { Name = "Change Logs" }
+	LogsSection:Label("02.10.2026:")
+    LogsSection:Label("[~] LegitBot Fix")
+	LogsSection:Label("[+] PixelSurf")
+
+    local ExecSection = RightInfo:Section { Name = "Executor" }
+    ExecSection:Label("Executor: " .. ExecutorName)
+    ExecSection:Label("Version: " .. ExecutorVersion)
+end
 
 do
 	GlobalEnv.Enderphobia = GlobalEvents
@@ -2493,8 +2590,10 @@ do
 			if not Flags["Legit/AutoWall"] then
 				local params = RaycastParams.new()
 				params.FilterType = Enum.RaycastFilterType.Exclude
-				params.FilterDescendantsInstances = { LocalPlayer.Character, CurrentCamera }
-				local result = Workspace:Raycast(CurrentCamera.CFrame.Position, (hitbox.Position - CurrentCamera.CFrame.Position).Unit * 1000, params)
+				params.FilterDescendantsInstances = { LocalPlayer.Character, CurrentCamera, Workspace:FindFirstChild("Camera") }
+				local dir = (hitbox.Position - CurrentCamera.CFrame.Position)
+				local dist = dir.Magnitude
+				local result = Workspace:Raycast(CurrentCamera.CFrame.Position, dir.Unit * dist, params)
 				if not result or not result.Instance or not result.Instance:IsDescendantOf(char) then continue end
 			end
 
@@ -2521,18 +2620,15 @@ do
         if now - LegitBot.LastShot < fireRate then return end
 
         local target = LegitGetTarget()
-        if not target then return end
-
+		if not target then return end
 		local ammoTable = GlobalState.GarbageCollector.StatusTable
-		if not ammoTable or (ammoTable.ammocount or 0) <= 0 then return end
-
-        if Flags["Legit/AutoWall"] then
-            local penValue = fgun.Penetration and fgun.Penetration.Value or 100
-            local success = GlobalState.RageBot.Functions.WallBang(CurrentCamera.CFrame.Position, target.Part.Position, penValue, Flags["Legit/AutoWallMaxWalls"] or 1)
-            if not success then return end
-        end
-		
-        LegitBot.Debounce = true
+		if not ammoTable then return end
+		if Flags["Legit/AutoWall"] then
+			local penValue = fgun.Penetration and fgun.Penetration.Value or 100
+			local success = GlobalState.RageBot.Functions.WallBang(CurrentCamera.CFrame.Position, target.Part.Position, penValue, Flags["Legit/AutoWallMaxWalls"] or 1)
+			if not success then return end
+		end
+		LegitBot.Debounce = true
 
         local delay = (Flags["Legit/Delay"] or 0) / 1000
         if delay > 0 then task.wait(delay) end
@@ -3245,6 +3341,7 @@ do
 	RightSection:Toggle { Name = "Resolution Changer", Flag = "Misc/ResolutionEnabled", Default = false }
 	RightSection:Slider { Name = "Resolution", Default = 65, Min = 10, Max = 100, Flag = "Misc/ResolutionValue", Interval = 1 }
 	RightSection:Toggle { Name = "No Leg Animation", Flag = "Misc/NoLegAnim", Default = false }
+	RightSection:Toggle { Name = "Pixel Surf", Flag = "Misc/PixelSurf", Default = false }:Keybind { Name = "Pixel Surf", Flag = "Misc/PixelSurfKey", Key = Enum.KeyCode.Unknown, Mode = "toggle" }
 	RightSection:Toggle { Name = "Name Changer", Flag = "Misc/NameChanger", Default = false, Callback = function(val)
 		nameChangerEnabled = val
 	end }
@@ -3982,16 +4079,6 @@ do
     	end
 	end
 end
-
-Workspace.ChildAdded:Connect(function(child)
-    if child.Name == "Map" then
-        task.wait(0.5)
-        ApplySkybox()
-        if Flags["Visuals/FogEnabled"] then
-            atm.Parent = Lighting
-        end
-    end
-end)
 
 do
 	local GLOBAL_CHAMS_ALLOWED_PARTS = {
@@ -5381,6 +5468,62 @@ local function NoLegAnimation()
     legAnimDone = true
 end
 
+local wallGlideActive = false
+local GLIDE_SPEED = 37
+
+local function PixelSurf()
+    if not Flags["Misc/PixelSurf"] then
+        wallGlideActive = false
+        return
+    end
+    local char = localPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not root or not humanoid then return end
+
+    local inAir = humanoid.FloorMaterial == Enum.Material.Air
+    if not inAir then
+        wallGlideActive = false
+        return
+    end
+
+    local directions = {
+        Vector3.new(1,0,0), Vector3.new(-1,0,0),
+        Vector3.new(0,0,1), Vector3.new(0,0,-1)
+    }
+
+    local hitWall = false
+    local wallNormal = nil
+
+    for _, dir in ipairs(directions) do
+        local ray = Ray.new(root.Position, dir * 2.5)
+        local hit, pos, normal = Workspace:FindPartOnRayWithIgnoreList(ray, {char})
+        if hit then
+            local lookDir = CurrentCamera.CFrame.LookVector
+            local flatLook = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
+            local cornerCheck = Ray.new(root.Position + flatLook * 1.5, dir * 2.5)
+            local cornerHit = Workspace:FindPartOnRayWithIgnoreList(cornerCheck, {char})
+            if not cornerHit then
+                hitWall = false
+                break
+            end
+            hitWall = true
+            wallNormal = normal
+            break
+        end
+    end
+
+    if hitWall and wallNormal then
+        wallGlideActive = true
+        local lookDir = CurrentCamera.CFrame.LookVector
+        local glideDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
+        root.Velocity = Vector3.new(glideDir.X * GLIDE_SPEED, 0, glideDir.Z * GLIDE_SPEED)
+    else
+        wallGlideActive = false
+    end
+end
+
 localPlayer.CharacterAdded:Connect(function()
     legAnimDone = false
 end)
@@ -5632,6 +5775,8 @@ do
 	local TimerObject = Status.Timer
 
 	RageBotFunctions.HitPart = function(targetPlayer, hitboxName, gunName, damageMultiplier)
+		if not LocalPlayer.Character then return end
+		if not targetPlayer.Character then return end
 		local gun = FindFirstChild(LocalPlayer.Character, "Gun")
 		local targetPart = FindFirstChild(targetPlayer.Character, hitboxName or "Head")
 		local isJumpingOrFalling = (GlobalState.Utility.IsJumpingOrFalling() or false)
@@ -6513,7 +6658,16 @@ Workspace.ChildAdded:Connect(function(child)
         ApplySkybox()
     end
 end)
-ApplySkybox()
+
+Workspace.ChildAdded:Connect(function(child)
+    if child.Name == "Map" then
+        task.wait(0.5)
+        ApplySkybox()
+        if Flags["Visuals/FogEnabled"] then
+            atm.Parent = Lighting
+        end
+    end
+end)
 
 function kykoldingrenade()
 	local ok, weapName = pcall(function()
@@ -6984,6 +7138,7 @@ task.spawn(function()
 end)
 
 runService.Heartbeat:Connect(function()
+	PixelSurf()
 	NoLegAnimation()
     for _, plr in ipairs(players:GetPlayers()) do
         if plr ~= players.LocalPlayer then
