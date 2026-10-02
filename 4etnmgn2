@@ -959,7 +959,6 @@ local UISettingsTab
 local Connections = {}
 local FlagTypes = {}
 local TabIcons = {
-	Info = "info",
 	Rage = "crosshair",
 	Legit = "circle-plus",
 	Misc = "box",
@@ -2386,7 +2385,6 @@ end
 
 local MainWindow = UILibrary:Window { name = "Enderphobia", Icon = 112012071630242 }
 local Tabs = {
-	[8] = { Name = "Info", Object = MainWindow:Tab { name = "Info" } },
 	[1] = { Name = "RageBot", Object = MainWindow:Tab { name = "Rage",  } },
 	[6] = { Name = "Legit", Object = MainWindow:Tab { name = "Legit" } },
 	[3] = { Name = "ESP", Object = MainWindow:Tab { name = "Esp" } },
@@ -2395,7 +2393,6 @@ local Tabs = {
 	[7] = { Name = "Skins", Object = MainWindow:Tab { name = "Skins" } },
 }
 local Columns = {
-	[8] = { Name = "Info", Left = Tabs[8].Object:Column(), Right = Tabs[8].Object:Column() },
 	[1] = { Name = "RageBot", Left = Tabs[1].Object:Column(), Right = Tabs[1].Object:Column() },
 	[6] = { Name = "Legit", Left = Tabs[6].Object:Column(), Right = Tabs[6].Object:Column() },
 	[3] = { Name = "ESP", Left = Tabs[3].Object:Column(), Right = Tabs[3].Object:Column() },
@@ -2403,105 +2400,6 @@ local Columns = {
 	[2] = { Name = "Misc", Left = Tabs[2].Object:Column(), Right = Tabs[2].Object:Column() },
 	[7] = { Name = "Skins", Left = Tabs[7].Object:Column(), Right = Tabs[7].Object:Column() },
 }
-
-local function GetUserDataPath()
-    if not isfolder("enderphobia") then
-        makefolder("enderphobia")
-    end
-    return "enderphobia/userdata.json"
-end
-
-local function LoadUserData()
-    local path = GetUserDataPath()
-    if isfile(path) then
-        local ok, data = pcall(function()
-            return HttpService:JSONDecode(readfile(path))
-        end)
-        if ok and type(data) == "table" then
-            return data
-        end
-    end
-    return { TotalExecutions = 0 }
-end
-
-local function SaveUserData(data)
-    local path = GetUserDataPath()
-    pcall(function()
-        writefile(path, HttpService:JSONEncode(data))
-    end)
-end
-
-local UserData = LoadUserData()
-UserData.TotalExecutions = (UserData.TotalExecutions or 0) + 1
-SaveUserData(UserData)
-
-local function GetExecutorInfo()
-    local name, version = "Unknown", "Unknown"
-    if identifyexecutor then
-        local ok, n, v = pcall(identifyexecutor)
-        if ok then
-            if v then
-                name = tostring(n or "Unknown")
-                version = tostring(v)
-            elseif n then
-                local s = tostring(n)
-                local parsedName, parsedVer = s:match("^([^%s]+)%s+v?(.+)$")
-                if parsedName then
-                    name = parsedName
-                    version = parsedVer
-                else
-                    name = s
-                end
-            end
-        end
-    end
-    return name, version
-end
-
-local ExecutorName, ExecutorVersion = GetExecutorInfo()
-
-do
-    local InfoColumn = Columns[8]
-    local LeftInfo = InfoColumn.Left
-    local RightInfo = InfoColumn.Right
-
-    local UserSection = LeftInfo:Section { Name = "User" }
-    UserSection:Label("Username: " .. LocalPlayer.Name)
-    UserSection:Label("User ID: " .. tostring(LocalPlayer.UserId))
-    UserSection:Label("Total Executions: " .. tostring(UserData.TotalExecutions))
-
-    local CommunitySection = LeftInfo:Section { Name = "Community" }
-    CommunitySection:Label("Want to buy a key?")
-    CommunitySection:Label("Use Telegram or Funpay")
-	CommunitySection:Button { Name = "Copy Funpay Link", Callback = function()
-        local ok = pcall(function()
-            setclipboard("https://funpay.com/users/21637949/")
-        end)
-    end }
-    CommunitySection:Button { Name = "Copy Telegram Link (chat)", Callback = function()
-        local ok = pcall(function()
-            setclipboard("https://t.me/+66c2vLw1bgo2ZWRi")
-        end)
-    end }
-
-    local LogsSection = RightInfo:Section { Name = "Change Logs" }
-	LogsSection:Label("02.10.2026:")
-    LogsSection:Label("[~] LegitBot Fix")
-	LogsSection:Label("[+] PixelSurf")
-
-    local ExecSection = RightInfo:Section { Name = "Executor" }
-    ExecSection:Label("Executor: " .. ExecutorName)
-    ExecSection:Label("Version: " .. ExecutorVersion)
-end
-
-do
-	GlobalEnv.Enderphobia = GlobalEvents
-	GlobalEnv.RobloxObj = RenderObjectUtils
-	GlobalEnv.RemoteEvents = RemoteEvents
-	GlobalEnv.Library = UILibrary
-	GlobalEnv.Tabs = Tabs
-	GlobalEnv.Columns = Columns
-end
 
 do
 	local LeftColumn = Columns[1].Left
