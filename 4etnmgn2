@@ -5,7 +5,7 @@ if identifyexecutor then
     local name = identifyexecutor()
     local n = tostring(name):lower()
     if n:find("solara") or n:find("xeno") or n:find("codex") or n:find("vega") then
-        game:GetService("Players").LocalPlayer:Kick(tostring(name) .. " dont support")
+        game:GetService("Players").LocalPlayer:Kick(tostring(name) .. " dont support\nget a good (working) executor in telegram: t.me/enderphobia1337")
     end
 else
     print("иди нахуй")
