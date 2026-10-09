@@ -1,38 +1,379 @@
 -- проверка на пидорасов
 if identifyexecutor then
-    local name = identifyexecutor()
-    local n = tostring(name):lower()
-    if n:find("solara") or n:find("xeno") or n:find("codex") or n:find("vega") then
-        game:GetService("Players").LocalPlayer:Kick(tostring(name) .. " dont support\nget a good (working) executor in telegram: t.me/enderphobia1337")
-    end
+	local name = identifyexecutor()
+	local n = tostring(name):lower()
+	if n:find("solara") or n:find("xeno") or n:find("delta") or n:find("codex") or n:find("vega") then
+		game:GetService("Players").LocalPlayer:Kick(tostring(name) .. " dont support")
+	end
 else
-    print("иди нахуй")
+	print("иди нахуй")
 end
 
 do
-	local originalNamecallMethod
-	originalNamecallMethod = hookmetamethod(game, "__namecall", function(self, ...)
-		local methodName = getnamecallmethod()
-		
+	local orig
+	orig = hookmetamethod(game, "__namecall", function(self, ...)
+		local method = getnamecallmethod()
 		if self.Name == "HaIIoooooooooooo" or self.Name == "Boogers" then
-			if methodName == "FireServer"
-				or methodName == "Rem3"
-				or methodName == "Kick"
-				or methodName == "ewrtsjkwrslk"
-				or methodName == "FireUnreliable"
-				or methodName == "InvokeServer" then
+			if method == "FireServer"
+				or method == "Rem3"
+				or method == "Kick"
+				or method == "ewrtsjkwrslk"
+				or method == "FireUnreliable"
+				or method == "InvokeServer"
+			then
 				return nil
 			end
 		end
-		
-		return originalNamecallMethod(self, ...)
+		return orig(self, ...)
 	end)
 end
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService = game:GetService("HttpService")
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Client = getsenv(PlayerGui:WaitForChild("Client"))
+local Data = require(ReplicatedFirst:WaitForChild("Data"))
+
+local Events = ReplicatedStorage:WaitForChild("Events")
+local DataEvent = Events:WaitForChild("DataEvent")
+local InventoryEvent = Events:WaitForChild("InventoryAndLoadout")
+
+local SkinFolders = LocalPlayer:WaitForChild("SkinFolder")
+local SkinsFolder = ReplicatedStorage:WaitForChild("Skins")
+local GlovesFolder = ReplicatedStorage:WaitForChild("Gloves")
+
+local SkinUnlocker = {}
+SkinUnlocker.__index = SkinUnlocker
+
+SkinUnlocker.Teammates = {
+	CT = {
+		"P2000","USP","DualBerettas","P250","FiveSeven","CZ","DesertEagle","R8",
+		"Nova","XM","MAG7","M249","Negev",
+		"MP9","MP7","MP7-SD","UMP","P90","Bizon",
+		"Famas","M4A4","M4A1","Scout","AUG","AWP","G3SG1",
+		"Kevlar Vest","Kevlar + Helmet","Defuse Kit",
+		"Incendiary Grenade","Decoy Grenade","Flashbang","HE Grenade","Smoke Grenade",
+	},
+	T = {
+		"Glock","DualBerettas","P250","Tec9","CZ","DesertEagle","R8",
+		"Nova","XM","SawedOff","M249","Negev",
+		"MAC10","MP7","MP7-SD","UMP","P90","Bizon",
+		"Galil","AK47","Scout","SG","AWP","G3SG1",
+		"Kevlar Vest","Kevlar + Helmet",
+		"Molotov","Decoy Grenade","Flashbang","HE Grenade","Smoke Grenade",
+	},
+}
+
+function SkinUnlocker.CreateSet(Values)
+	local Set = {}
+	for i = 1, #Values do Set[Values[i]] = true end
+	return Set
+end
+
+function SkinUnlocker.IsKnife(WeaponName)
+	return WeaponName == "Knife"
+		or string.find(WeaponName, "Knife",    1, true) ~= nil
+		or string.find(WeaponName, "Bayonet",  1, true) ~= nil
+		or string.find(WeaponName, "Karambit", 1, true) ~= nil
+end
+
+function SkinUnlocker.new()
+	local self = setmetatable({}, SkinUnlocker)
+
+	self.Enabled   = false
+	self.Destroyed = false
+
+	self.Hooks = { GetData = nil, Namecall = nil, Inventory = {} }
+
+	self.SkinInfo  = {}
+	self.Inventory = {}
+	self.Loadouts  = { CT = {}, T = {} }
+
+	self.WeaponSets = {
+		CT = SkinUnlocker.CreateSet(SkinUnlocker.Teammates.CT),
+		T  = SkinUnlocker.CreateSet(SkinUnlocker.Teammates.T),
+	}
+
+	self:Collect()
+	return self
+end
+
+function SkinUnlocker:GetTeamLoadout(Team)  return Client[Team .. "Loadout"] end
+function SkinUnlocker:GetTeamFolder(Team)   return SkinFolders:FindFirstChild(Team .. "Folder") end
+function SkinUnlocker:IsSpecialSlot(Slot)   return Slot == "Knife" or Slot == "Glove" end
+function SkinUnlocker:IsValidTeam(Team)     return Team == "CT" or Team == "T" end
+function SkinUnlocker:GetSkinId(W, S)       return W .. "_" .. S end
+
+function SkinUnlocker:RegisterSkin(WeaponName, SkinName, Type)
+	if SkinName == "Stock" then return end
+	local FullId = self:GetSkinId(WeaponName, SkinName)
+	if self.SkinInfo[FullId] then return end
+
+	self.SkinInfo[FullId]  = { Weapon = WeaponName, Skin = SkinName, Type = Type, FullId = FullId }
+	self.Inventory[FullId] = { FullId }
+
+	if Type == "Knife" or Type == "Glove" then
+		self.Loadouts.CT[FullId] = { FullId }
+		self.Loadouts.T[FullId]  = { FullId }
+		return
+	end
+	if Type ~= "Weapon" then return end
+	if self.WeaponSets.CT[WeaponName] then self.Loadouts.CT[FullId] = { FullId } end
+	if self.WeaponSets.T[WeaponName]  then self.Loadouts.T[FullId]  = { FullId } end
+end
+
+function SkinUnlocker:CollectWeapons()
+	for _, Folder in SkinsFolder:GetChildren() do
+		if not Folder:IsA("Folder") then continue end
+		local Type = SkinUnlocker.IsKnife(Folder.Name) and "Knife" or "Weapon"
+		for _, Skin in Folder:GetChildren() do
+			self:RegisterSkin(Folder.Name, Skin.Name, Type)
+		end
+	end
+end
+
+function SkinUnlocker:CollectGloves()
+	for _, Folder in GlovesFolder:GetChildren() do
+		if not Folder:IsA("Folder") or Folder.Name == "Model" then continue end
+		for _, Skin in Folder:GetChildren() do
+			self:RegisterSkin(Folder.Name, Skin.Name, "Glove")
+		end
+	end
+end
+
+function SkinUnlocker:Collect()
+	table.clear(self.SkinInfo)
+	table.clear(self.Inventory)
+	table.clear(self.Loadouts.CT)
+	table.clear(self.Loadouts.T)
+	self:CollectWeapons()
+	self:CollectGloves()
+end
+
+function SkinUnlocker:IsManagedSkin(Value)
+	return type(Value) == "table"
+		and type(Value[1]) == "string"
+		and self.SkinInfo[Value[1]] ~= nil
+end
+
+function SkinUnlocker:MergeTeam(Team)
+	local Loadout = self.Loadouts[Team]
+	if not Loadout then return end
+	for SkinId, Value in Loadout do
+		local L = self:GetTeamLoadout(Team)
+		if L then L[SkinId] = Value end
+	end
+end
+
+function SkinUnlocker:Merge()
+	self:MergeTeam("CT")
+	self:MergeTeam("T")
+end
+
+function SkinUnlocker:RemoveSpecialSlots(Team)
+	local Loadout = self:GetTeamLoadout(Team)
+	if not Loadout then return end
+	for _, Slot in { "Knife", "Glove" } do
+		local cur = Loadout[Slot]
+		if self:IsManagedSkin(cur) then
+			Loadout[Slot] = nil
+			Loadout[Slot .. "Over"] = nil
+		end
+	end
+end
+
+function SkinUnlocker:UnmergeTeam(Team)
+	local Loadout = self:GetTeamLoadout(Team)
+	local Managed = self.Loadouts[Team]
+	if not Loadout or not Managed then return end
+	for SkinId in Managed do
+		local cur = Loadout[SkinId]
+		if type(cur) == "table" and cur[1] == SkinId then
+			Loadout[SkinId] = nil
+		end
+	end
+	self:RemoveSpecialSlots(Team)
+end
+
+function SkinUnlocker:Unmerge()
+	self:UnmergeTeam("CT")
+	self:UnmergeTeam("T")
+end
+
+function SkinUnlocker:ApplySpecialSlot(Team, Slot, Info)
+	local TeamFolder = self:GetTeamFolder(Team)
+	if TeamFolder then
+		local obj = TeamFolder:FindFirstChild(Slot)
+		if obj then obj.Value = Info.Skin end
+	end
+	local Loadout = self:GetTeamLoadout(Team)
+	if Loadout then
+		Loadout[Slot .. "Over"] = true
+		Loadout[Slot] = { Info.FullId }
+	end
+end
+
+function SkinUnlocker:ApplyWeapon(Team, Info)
+	local TeamFolder = self:GetTeamFolder(Team)
+	if not TeamFolder then return end
+	local w = TeamFolder:FindFirstChild(Info.Weapon)
+	if w then w.Value = Info.Skin end
+end
+
+function SkinUnlocker:ApplySkin(Team, Slot, Info)
+	if self:IsSpecialSlot(Slot) then
+		self:ApplySpecialSlot(Team, Slot, Info)
+	else
+		self:ApplyWeapon(Team, Info)
+	end
+end
+
+function SkinUnlocker:ApplyToTeams(Team, Slot, Info)
+	if Team == "Both" then
+		self:ApplySkin("CT", Slot, Info)
+		self:ApplySkin("T",  Slot, Info)
+	elseif self:IsValidTeam(Team) then
+		self:ApplySkin(Team, Slot, Info)
+	end
+end
+
+function SkinUnlocker:HandleEquip(Packet)
+	if type(Packet) ~= "table" or Packet[1] ~= "EquipItem" then return end
+	local Team    = Packet[2]
+	local Slot    = Packet[3]
+	local Wrapper = Packet[4]
+	if type(Wrapper) ~= "table" then return end
+	local FullId = Wrapper[1]
+	if type(FullId) ~= "string" then return end
+	local Info = self.SkinInfo[FullId]
+	if not Info then return end
+	self:ApplyToTeams(Team, Slot, Info)
+end
+
+function SkinUnlocker:InstallDataHook()
+	if self.Hooks.GetData then return end
+	local Orig
+	Orig = hookfunction(Data.GetData, function(DataType, ...)
+		local Result = Orig(DataType, ...)
+		if not self.Enabled or type(Result) ~= "table" then return Result end
+		if DataType == "Inventory" then
+			for id, v in self.Inventory do Result[id] = v end
+		elseif DataType == "CTLoadout" then
+			for id, v in self.Loadouts.CT do Result[id] = v end
+		elseif DataType == "TLoadout" then
+			for id, v in self.Loadouts.T do Result[id] = v end
+		end
+		return Result
+	end)
+	self.Hooks.GetData = Orig
+end
+
+function SkinUnlocker:InstallInventoryHooks()
+	if #self.Hooks.Inventory > 0 then return end
+	for _, Conn in getconnections(InventoryEvent.OnClientEvent) do
+		local Fn = Conn.Function
+		if type(Fn) ~= "function" then continue end
+		local Orig
+		Orig = hookfunction(Fn, function(DataType, Skins, ...)
+			if self.Enabled then
+				if DataType == "Inventory" then
+					Skins = self.Inventory
+				elseif DataType == "CTLoadout" then
+					Skins = Client.CTLoadout
+				elseif DataType == "TLoadout" then
+					Skins = Client.TLoadout
+				end
+			end
+			return Orig(DataType, Skins, ...)
+		end)
+		table.insert(self.Hooks.Inventory, { Function = Fn, Original = Orig })
+	end
+end
+
+function SkinUnlocker:InstallNamecallHook()
+	if self.Hooks.Namecall then return end
+	local Orig
+	Orig = hookmetamethod(game, "__namecall", function(Self, ...)
+		if self.Enabled and Self == DataEvent and getnamecallmethod() == "FireServer" then
+			local args   = { ... }
+			local packet = args[1]
+			if type(packet) == "table" and packet[1] == "EquipItem" then
+				self:HandleEquip(packet)
+				return
+			end
+		end
+		return Orig(Self, ...)
+	end)
+	self.Hooks.Namecall = Orig
+end
+
+function SkinUnlocker:InstallHooks()
+	self:InstallDataHook()
+	self:InstallInventoryHooks()
+	self:InstallNamecallHook()
+end
+
+function SkinUnlocker:GetOriginalData(DataType)
+	if not self.Hooks.GetData then return {} end
+	return self.Hooks.GetData(DataType)
+end
+
+function SkinUnlocker:GetRefreshData()
+	if self.Enabled then
+		return self.Inventory, Client.CTLoadout, Client.TLoadout
+	end
+	return self:GetOriginalData("Inventory"),
+		self:GetOriginalData("CTLoadout"),
+		self:GetOriginalData("TLoadout")
+end
+
+function SkinUnlocker:FireInventoryUpdate()
+	local Inv, CT, T = self:GetRefreshData()
+	task.defer(function()
+		firesignal(InventoryEvent.OnClientEvent, "Inventory", Inv)
+		task.defer(function()
+			firesignal(InventoryEvent.OnClientEvent, "CTLoadout", CT)
+			firesignal(InventoryEvent.OnClientEvent, "TLoadout",  T)
+		end)
+	end)
+end
+
+function SkinUnlocker:Enable()
+	if self.Destroyed then return self end
+	self:InstallHooks()
+	if self.Enabled then
+		self:FireInventoryUpdate()
+		return self
+	end
+	self.Enabled = true
+	self:Merge()
+	self:FireInventoryUpdate()
+	return self
+end
+
+function SkinUnlocker:Disable()
+	if self.Destroyed or not self.Enabled then return self end
+	self.Enabled = false
+	self:Unmerge()
+	self:FireInventoryUpdate()
+	return self
+end
+
+function SkinUnlocker:Destroy()
+	if self.Destroyed then return end
+	self:Disable()
+	self.Hooks.GetData = nil
+	self.Hooks.Namecall = nil
+	table.clear(self.Hooks.Inventory)
+	table.clear(self.SkinInfo)
+	table.clear(self.Inventory)
+	table.clear(self.Loadouts.CT)
+	table.clear(self.Loadouts.T)
+	self.Destroyed = true
+end
 
 local ObsidianRepo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local Library = loadstring(game:HttpGet(ObsidianRepo .. "Library.lua"))()
@@ -43,401 +384,203 @@ Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
 
 local function BuildMainUI()
-    local ObsidianRepo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
-    local Library = loadstring(game:HttpGet(ObsidianRepo .. "Library.lua"))()
-    local ThemeManager = loadstring(game:HttpGet(ObsidianRepo .. "addons/ThemeManager.lua"))()
-    local SaveManager = loadstring(game:HttpGet(ObsidianRepo .. "addons/SaveManager.lua"))()
+	local Lib = loadstring(game:HttpGet(ObsidianRepo .. "Library.lua"))()
+	local TM  = loadstring(game:HttpGet(ObsidianRepo .. "addons/ThemeManager.lua"))()
+	local SM  = loadstring(game:HttpGet(ObsidianRepo .. "addons/SaveManager.lua"))()
 
-    Library.ForceCheckbox = false
-    Library.ShowToggleFrameInKeybinds = true
+	Lib.ForceCheckbox = false
+	Lib.ShowToggleFrameInKeybinds = true
 
-    local Window = Library:CreateWindow({
-        Title = "SkinChanger",
-        Footer = "t.me/enderphobia1337",
-        NotifySide = "Right",
-        Icon = 112012071630242,
-        ShowCustomCursor = true,
-    })
+	local Window = Lib:CreateWindow({
+		Title = "SkinChanger",
+		Footer = "t.me/enderphobia1337",
+		NotifySide = "Right",
+		Icon = 112012071630242,
+		ShowCustomCursor = true,
+	})
 
-    local SkinTab = Window:AddTab("Skins", "palette")
-    local UISettingsTab = Window:AddTab("UI Settings", "settings")
+	local SkinTab       = Window:AddTab("Skins",       "palette")
+	local UISettingsTab = Window:AddTab("UI Settings", "settings")
+	local LeftGroup     = SkinTab:AddLeftGroupbox("Counter-Terrorists")
+	local RightGroup    = SkinTab:AddRightGroupbox("Terrorists")
 
-    local LeftGroup = SkinTab:AddLeftGroupbox("Counter-Terrorists")
-    local RightGroup = SkinTab:AddRightGroupbox("Terrorists")
+	if makefolder then pcall(makefolder, "SkinChanger") end
 
-    if makefolder then
-        pcall(makefolder, "SkinChanger")
-    end
+	local MenuGroup = UISettingsTab:AddLeftGroupbox("Menu", "wrench")
+	MenuGroup:AddToggle("KeybindMenuOpen", {
+		Default = Lib.KeybindFrame.Visible,
+		Text = "Open Keybind Menu",
+		Callback = function(v) Lib.KeybindFrame.Visible = v end,
+	})
+	MenuGroup:AddToggle("ShowCustomCursor", {
+		Text = "Custom Cursor",
+		Default = Lib.ShowCustomCursor,
+		Callback = function(v) Lib.ShowCustomCursor = v end,
+	})
+	MenuGroup:AddToggle("AlwaysOnTop", {
+		Text = "Always On Top",
+		Default = Window.AlwaysOnTop,
+		Callback = function(v) Window:SetAlwaysOnTop(v) end,
+	})
+	MenuGroup:AddDropdown("NotificationSide", {
+		Values = { "Left", "Right" },
+		Default = "Right",
+		Text = "Notification Side",
+		Callback = function(v) Lib:SetNotifySide(v) end,
+	})
+	MenuGroup:AddDropdown("DPIDropdown", {
+		Values = { "50%","75%","100%","125%","150%","175%","200%" },
+		Default = "100%",
+		Text = "DPI Scale",
+		Callback = function(v) Lib:SetDPIScale(tonumber(v:gsub("%%",""))) end,
+	})
+	MenuGroup:AddSlider("UICornerSlider", {
+		Text = "Corner Radius",
+		Default = Lib.CornerRadius,
+		Min = 0, Max = 20, Rounding = 0,
+		Callback = function(v) Window:SetCornerRadius(v) end,
+	})
+	MenuGroup:AddDivider()
+	MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
+		Default = "End", NoUI = true, Text = "Menu keybind",
+	})
+	MenuGroup:AddButton("Unload", function() Lib:Unload() end)
 
-    local MenuGroup = UISettingsTab:AddLeftGroupbox("Menu", "wrench")
+	Lib.ToggleKeybind = Lib.Options.MenuKeybind
+	TM:SetLibrary(Lib)
+	SM:SetLibrary(Lib)
+	SM:IgnoreThemeSettings()
+	SM:SetIgnoreIndexes({ "MenuKeybind" })
+	TM:SetFolder("SkinChanger")
+	SM:SetFolder("SkinChanger/menu")
+	SM:BuildConfigSection(UISettingsTab)
+	TM:ApplyToTab(UISettingsTab)
+	SM:LoadAutoloadConfig()
 
-    MenuGroup:AddToggle("KeybindMenuOpen", {
-        Default = Library.KeybindFrame.Visible,
-        Text = "Open Keybind Menu",
-        Callback = function(value)
-            Library.KeybindFrame.Visible = value
-        end,
-    })
-    MenuGroup:AddToggle("ShowCustomCursor", {
-        Text = "Custom Cursor",
-        Default = Library.ShowCustomCursor,
-        Callback = function(Value)
-            Library.ShowCustomCursor = Value
-        end,
-    })
-    MenuGroup:AddToggle("AlwaysOnTop", {
-        Text = "Always On Top",
-        Default = Window.AlwaysOnTop,
-        Callback = function(Value)
-            Window:SetAlwaysOnTop(Value)
-        end,
-    })
-    MenuGroup:AddDropdown("NotificationSide", {
-        Values = { "Left", "Right" },
-        Default = "Right",
-        Text = "Notification Side",
-        Callback = function(Value)
-            Library:SetNotifySide(Value)
-        end,
-    })
-    MenuGroup:AddDropdown("DPIDropdown", {
-        Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
-        Default = "100%",
-        Text = "DPI Scale",
-        Callback = function(Value)
-            Value = Value:gsub("%%", "")
-            Library:SetDPIScale(tonumber(Value))
-        end,
-    })
-    MenuGroup:AddSlider("UICornerSlider", {
-        Text = "Corner Radius",
-        Default = Library.CornerRadius,
-        Min = 0,
-        Max = 20,
-        Rounding = 0,
-        Callback = function(value)
-            Window:SetCornerRadius(value)
-        end,
-    })
-    MenuGroup:AddDivider()
-    MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
-        Default = "End",
-        NoUI = true,
-        Text = "Menu keybind",
-    })
-    MenuGroup:AddButton("Unload", function()
-        Library:Unload()
-    end)
+	local function getTeam(weapon)
+		local inCT = SkinUnlocker.CreateSet(SkinUnlocker.Teammates.CT)[weapon]
+		local inT  = SkinUnlocker.CreateSet(SkinUnlocker.Teammates.T)[weapon]
+		if inCT and inT then return "Both"
+		elseif inCT then return "CT"
+		elseif inT  then return "T"
+		else return nil end
+	end
 
-    Library.ToggleKeybind = Library.Options.MenuKeybind
+	local function buildSkinData()
+		local knifeSkins, gloveSkins, weaponSkins = {}, {}, {}
+		if not SkinsFolder then return knifeSkins, gloveSkins, weaponSkins end
 
-    ThemeManager:SetLibrary(Library)
-    SaveManager:SetLibrary(Library)
+		for _, folder in SkinsFolder:GetChildren() do
+			if folder:IsA("Folder") then
+				local wName = folder.Name
+				local team  = getTeam(wName)
+				if team then
+					if not weaponSkins[wName] then
+						weaponSkins[wName] = { team = team, skins = {} }
+					end
+					for _, skinObj in folder:GetChildren() do
+						if skinObj.Name ~= "Stock" then
+							table.insert(weaponSkins[wName].skins, skinObj.Name)
+						end
+					end
+				else
+					for _, skinObj in folder:GetChildren() do
+						if skinObj.Name ~= "Stock" then
+							table.insert(knifeSkins, wName .. "_" .. skinObj.Name)
+						end
+					end
+				end
+			end
+		end
 
-    SaveManager:IgnoreThemeSettings()
-    SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+		for _, folder in GlovesFolder:GetChildren() do
+			if folder:IsA("Folder") and folder.Name ~= "Model" then
+				for _, skinObj in folder:GetChildren() do
+					table.insert(gloveSkins, folder.Name .. "_" .. skinObj.Name)
+				end
+			end
+		end
 
-    ThemeManager:SetFolder("SkinChanger")
-    SaveManager:SetFolder("SkinChanger/menu")
+		return knifeSkins, gloveSkins, weaponSkins
+	end
 
-    SaveManager:BuildConfigSection(UISettingsTab)
-    ThemeManager:ApplyToTab(UISettingsTab)
+	local knifeSkins, gloveSkins, weaponSkins = buildSkinData()
+	table.sort(knifeSkins)
+	table.sort(gloveSkins)
 
-    SaveManager:LoadAutoloadConfig()
+	local function fireEquip(team, slot, fullId)
+		DataEvent:FireServer({
+			[1] = "EquipItem",
+			[2] = team,
+			[3] = slot,
+			[4] = { [1] = fullId },
+		})
+	end
 
-    local function getTeam(weapon)
-        local CTWeapons = {
-            "P2000","USP","DualBerettas","P250","FiveSeven","CZ","DesertEagle","R8",
-            "Nova","XM","MAG7","M249","Negev",
-            "MP9","MP7","MP7-SD","UMP","P90","Bizon",
-            "Famas","M4A4","M4A1","Scout","AUG","AWP","G3SG1",
-            "Kevlar Vest","Kevlar + Helmet","Defuse Kit",
-            "Incendiary Grenade","Decoy Grenade","Flashbang","HE Grenade","Smoke Grenade"
-        }
-        local TWeapons = {
-            "Glock","DualBerettas","P250","Tec9","CZ","DesertEagle","R8",
-            "Nova","XM","SawedOff","M249","Negev",
-            "MAC10","MP7","MP7-SD","UMP","P90","Bizon",
-            "Galil","AK47","Scout","SG","AWP","G3SG1",
-            "Kevlar Vest","Kevlar + Helmet",
-            "Molotov","Decoy Grenade","Flashbang","HE Grenade","Smoke Grenade"
-        }
-        local inCT = table.find(CTWeapons, weapon) ~= nil
-        local inT  = table.find(TWeapons, weapon) ~= nil
-        if inCT and inT then return "Both"
-        elseif inCT then return "CT"
-        elseif inT then return "T"
-        else return nil end
-    end
+	local function createDropdown(group, weaponName, skins, team)
+		local values = { "None" }
+		for _, s in ipairs(skins) do table.insert(values, s) end
+		group:AddDropdown("Skin_" .. weaponName .. "_" .. team, {
+			Values    = values,
+			Default   = "None",
+			Multi     = false,
+			Text      = weaponName,
+			Searchable = #skins > 10,
+			Callback  = function(Value)
+				if Value == "None" then return end
+				fireEquip(team, weaponName, weaponName .. "_" .. Value)
+			end,
+		})
+	end
 
-    local function buildSkinData()
-        local knifeSkins, gloveSkins, weaponSkins = {}, {}, {}
+	local function createCategoryDropdown(group, category, skinList, team, itemType)
+		local values = { "None" }
+		for _, s in ipairs(skinList) do table.insert(values, s) end
+		group:AddDropdown("Skin_" .. category .. "_" .. team, {
+			Values    = values,
+			Default   = "None",
+			Multi     = false,
+			Text      = category,
+			Searchable = #skinList > 10,
+			Callback  = function(Value)
+				if Value == "None" then return end
+				fireEquip(team, itemType, Value)
+			end,
+		})
+	end
 
-        if not ReplicatedStorage:FindFirstChild("Skins") then
-            warn("Skins folder not found!")
-            return knifeSkins, gloveSkins, weaponSkins
-        end
+	if #knifeSkins > 0 then
+		createCategoryDropdown(LeftGroup,  "Knifes", knifeSkins, "CT", "Knife")
+		createCategoryDropdown(RightGroup, "Knifes", knifeSkins, "T",  "Knife")
+	end
+	if #gloveSkins > 0 then
+		createCategoryDropdown(LeftGroup,  "Gloves", gloveSkins, "CT", "Glove")
+		createCategoryDropdown(RightGroup, "Gloves", gloveSkins, "T",  "Glove")
+	end
 
-        for _, folder in ReplicatedStorage.Skins:GetChildren() do
-            if folder:IsA("Folder") then
-                local weaponName = folder.Name
-                local team = getTeam(weaponName)
-                if team then
-                    if not weaponSkins[weaponName] then
-                        weaponSkins[weaponName] = { team = team, skins = {} }
-                    end
-                    for _, skinObj in folder:GetChildren() do
-                        local skinName = skinObj.Name
-                        if skinName ~= "Stock" then
-                            table.insert(weaponSkins[weaponName].skins, skinName)
-                        end
-                    end
-                else
-                    for _, skinObj in folder:GetChildren() do
-                        local skinName = skinObj.Name
-                        if skinName ~= "Stock" then
-                            table.insert(knifeSkins, weaponName .. "_" .. skinName)
-                        end
-                    end
-                end
-            end
-        end
+	local weaponNames = {}
+	for w in pairs(weaponSkins) do table.insert(weaponNames, w) end
+	table.sort(weaponNames)
 
-        if ReplicatedStorage:FindFirstChild("Gloves") then
-            for _, folder in ReplicatedStorage.Gloves:GetChildren() do
-                if folder:IsA("Folder") and folder.Name ~= "Model" then
-                    local gloveName = folder.Name
-                    for _, skinObj in folder:GetChildren() do
-                        table.insert(gloveSkins, gloveName .. "_" .. skinObj.Name)
-                    end
-                end
-            end
-        end
+	for _, w in ipairs(weaponNames) do
+		local d = weaponSkins[w]
+		if d.team == "CT" or d.team == "Both" then createDropdown(LeftGroup,  w, d.skins, "CT") end
+		if d.team == "T"  or d.team == "Both" then createDropdown(RightGroup, w, d.skins, "T")  end
+	end
 
-        return knifeSkins, gloveSkins, weaponSkins
-    end
-
-    local knifeSkins, gloveSkins, weaponSkins = buildSkinData()
-    table.sort(knifeSkins)
-    table.sort(gloveSkins)
-
-    local function createDropdown(group, weaponName, skins, team)
-        local values = {"None"}
-        for _, skin in ipairs(skins) do table.insert(values, skin) end
-        group:AddDropdown("Skin_" .. weaponName .. "_" .. team, {
-            Values = values,
-            Default = "None",
-            Multi = false,
-            Text = weaponName,
-            Searchable = #skins > 10,
-            Callback = function(Value)
-                if Value == "None" then return end
-                local fullName = weaponName .. "_" .. Value
-                local DataEvent = ReplicatedStorage:FindFirstChild("Events")
-                if DataEvent then
-                    DataEvent = DataEvent:FindFirstChild("DataEvent")
-                    if DataEvent then
-                        DataEvent:FireServer({
-                            [1] = "EquipItem",
-                            [2] = team,
-                            [3] = weaponName,
-                            [4] = { [1] = fullName }
-                        })
-                    end
-                end
-            end
-        })
-    end
-
-    local function createCategoryDropdown(group, category, skinList, team, itemType)
-        local values = {"None"}
-        for _, skin in ipairs(skinList) do table.insert(values, skin) end
-        group:AddDropdown("Skin_" .. category .. "_" .. team, {
-            Values = values,
-            Default = "None",
-            Multi = false,
-            Text = category,
-            Searchable = #skinList > 10,
-            Callback = function(Value)
-                if Value == "None" then return end
-                local DataEvent = ReplicatedStorage:FindFirstChild("Events")
-                if DataEvent then
-                    DataEvent = DataEvent:FindFirstChild("DataEvent")
-                    if DataEvent then
-                        DataEvent:FireServer({
-                            [1] = "EquipItem",
-                            [2] = team,
-                            [3] = itemType,
-                            [4] = { [1] = Value }
-                        })
-                    end
-                end
-            end
-        })
-    end
-
-    if #knifeSkins > 0 then
-        createCategoryDropdown(LeftGroup,  "Knifes", knifeSkins, "CT", "Knife")
-        createCategoryDropdown(RightGroup, "Knifes", knifeSkins, "T",  "Knife")
-    end
-    if #gloveSkins > 0 then
-        createCategoryDropdown(LeftGroup,  "Gloves", gloveSkins, "CT", "Glove")
-        createCategoryDropdown(RightGroup, "Gloves", gloveSkins, "T",  "Glove")
-    end
-
-    local weaponNames = {}
-    for w in pairs(weaponSkins) do table.insert(weaponNames, w) end
-    table.sort(weaponNames)
-
-    for _, w in ipairs(weaponNames) do
-        local data = weaponSkins[w]
-        if data.team == "CT" or data.team == "Both" then
-            createDropdown(LeftGroup, w, data.skins, "CT")
-        end
-        if data.team == "T" or data.team == "Both" then
-            createDropdown(RightGroup, w, data.skins, "T")
-        end
-    end
-
-    local function setupInventoryUnlock()
-        local Client = getsenv(LocalPlayer and LocalPlayer.PlayerGui and LocalPlayer.PlayerGui:FindFirstChild("Client"))
-        if not Client then
-            warn("[SkinChanger] Client script not found")
-            return
-        end
-
-        local SkinsTable = {}
-        for _, Value in ReplicatedStorage.Skins:GetChildren() do
-            if Value:IsA("Folder") then
-                local GunName = Value.Name
-                for _, Skin in Value:GetChildren() do
-                    local SkinName = Skin.Name
-                    if SkinName ~= "Stock" then
-                        SkinsTable[HttpService:GenerateGUID(false)] = { GunName .. "_" .. SkinName }
-                    end
-                end
-            end
-        end
-
-        for _, Value in ReplicatedStorage.Gloves:GetChildren() do
-            if Value:IsA("Folder") and Value.Name ~= "Model" then
-                local GloveName = Value.Name
-                for _, Skin in Value:GetChildren() do
-                    SkinsTable[HttpService:GenerateGUID(false)] = { GloveName .. "_" .. Skin.Name }
-                end
-            end
-        end
-
-        local Data = require(
-            ReplicatedStorage:FindFirstChild("ReplicatedFirst")
-                and ReplicatedStorage.ReplicatedFirst:FindFirstChild("Data")
-                or game:GetService("ReplicatedFirst"):FindFirstChild("Data")
-        )
-        if Data then
-            local OldGetData
-            OldGetData = hookfunction(Data.GetData, function(Type, ...)
-                if Type ~= nil then
-                    local ToReturn = OldGetData(Type, ...)
-                    for Index, Value in SkinsTable do
-                        ToReturn[tostring(Index)] = Value
-                    end
-                    return ToReturn
-                end
-                return OldGetData(Type, ...)
-            end)
-        end
-
-        local InventoryEvent = ReplicatedStorage:FindFirstChild("Events")
-            and ReplicatedStorage.Events:FindFirstChild("InventoryAndLoadout")
-        if InventoryEvent then
-            for _, Value in getconnections(InventoryEvent.OnClientEvent) do
-                local Function = Value.Function
-                if Function then
-                    local OldHook
-                    OldHook = hookfunction(Function, function(Type, Skins, ...)
-                        if Type == "CTLoadout" then
-                            Skins = Client.CTLoadout
-                        elseif Type == "TLoadout" then
-                            Skins = Client.TLoadout
-                        elseif Type == "Inventory" then
-                            Skins = SkinsTable
-                        end
-                        return OldHook(Type, Skins, ...)
-                    end)
-                end
-            end
-        end
-
-        local DataEvent = ReplicatedStorage:FindFirstChild("Events")
-            and ReplicatedStorage.Events:FindFirstChild("DataEvent")
-        if DataEvent then
-            local OldNamecall
-            OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-                local Method = getnamecallmethod()
-                local Args = {...}
-                if Method == "FireServer" and self and self.Name == "DataEvent" then
-                    local Table = Args[1]
-                    if Table and Table[1] == "EquipItem" then
-                        if Table[2] ~= "Both" then
-                            local SkinFolder = LocalPlayer.SkinFolder[Table[2] .. "Folder"]
-                            local Weapon, Skin = table.unpack(string.split(Table[4][1], "_"))
-                            if Table[3] == "Knife" or Table[3] == "Glove" then
-                                SkinFolder[Table[3]].Value = Skin
-                                local Loadout = Client[Table[2] .. "Loadout"]
-                                if Loadout then
-                                    Loadout[Table[3] .. "Over"] = true
-                                    Loadout[Table[3]] = { tostring(Weapon .. "_" .. Skin) }
-                                end
-                            else
-                                SkinFolder[Weapon].Value = Skin
-                            end
-                        else
-                            for _, Team in {"CT", "T"} do
-                                local SkinFolder = LocalPlayer.SkinFolder[Team .. "Folder"]
-                                local Weapon, Skin = table.unpack(string.split(Table[4][1], "_"))
-                                if Table[3] == "Knife" or Table[3] == "Glove" then
-                                    SkinFolder[Table[3]].Value = Skin
-                                    local Loadout = Client[Team .. "Loadout"]
-                                    if Loadout then
-                                        Loadout[Table[3] .. "Over"] = true
-                                        Loadout[Table[3]] = { tostring(Weapon .. "_" .. Skin) }
-                                    end
-                                else
-                                    SkinFolder[Weapon].Value = Skin
-                                end
-                            end
-                        end
-                    end
-                end
-                return OldNamecall(self, ...)
-            end)
-        end
-
-        local function refreshInventory()
-            if InventoryEvent then
-                firesignal(InventoryEvent.OnClientEvent, "Inventory", SkinsTable)
-                firesignal(InventoryEvent.OnClientEvent, "CTLoadout", Client.CTLoadout)
-                firesignal(InventoryEvent.OnClientEvent, "TLoadout", Client.TLoadout)
-            end
-        end
-
-        refreshInventory()
-    end
-
-    task.wait(1)
-    pcall(setupInventoryUnlock)
+	SkinUnlocker.new():Enable()
 end
 
+
 local KeyWindow = Library:CreateWindow({
-    Title = "Enderphobia",
-    Footer = "t.me/Enderphobia1337",
-    Icon = 112012071630242,
-    NotifySide = "Right",
-    ShowCustomCursor = true,
+	Title = "Enderphobia",
+	Footer = "t.me/Enderphobia1337",
+	Icon = 112012071630242,
+	NotifySide = "Right",
+	ShowCustomCursor = true,
 })
 
 local KeyTab = KeyWindow:AddKeyTab("Key System", "key")
-
 local unlocked = false
 
 KeyTab:AddLabel({
@@ -446,25 +589,14 @@ KeyTab:AddLabel({
 	Size = 16,
 })
 KeyTab:AddKeyBox(function(ReceivedKey)
-    if unlocked then return end
-
-    if ReceivedKey == "TG_ENDERPHOBIA1337" then
-        unlocked = true
-        Library:Notify({
-            Title = "Yep",
-            Description = "Loading..",
-            Time = 3,
-        })
-
-        Library:Unload()
-
-        task.wait(0.2)
-        BuildMainUI()
-    else
-        Library:Notify({
-            Title = "Error",
-            Description = "Wrong key",
-            Time = 3,
-        })
-    end
+	if unlocked then return end
+	if ReceivedKey == "TG_ENDERPHOBIA1337" then
+		unlocked = true
+		Library:Notify({ Title = "Yep", Description = "Loading..", Time = 3 })
+		Library:Unload()
+		task.wait(0.2)
+		BuildMainUI()
+	else
+		Library:Notify({ Title = "Error", Description = "Wrong key", Time = 3 })
+	end
 end)
