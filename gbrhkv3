@@ -1,3 +1,5 @@
+-- t.me/enderphobia1337
+-- спс за коды --> https://github.com/mental1illness <-- сч спизжен отсюда
 -- проверка на пидорасов
 if identifyexecutor then
 	local name = identifyexecutor()
